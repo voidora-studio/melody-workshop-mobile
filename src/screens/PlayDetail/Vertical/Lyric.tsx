@@ -1,5 +1,5 @@
-import { memo, useMemo, useEffect, useRef, useCallback } from 'react'
-import { View, FlatList, type FlatListProps, type LayoutChangeEvent, type NativeSyntheticEvent, type NativeScrollEvent, Alert, Pressable, Text as RNText } from 'react-native'
+import { memo, useMemo, useEffect, useRef, useCallback, useState } from 'react'
+import { Animated, View, FlatList, type FlatListProps, type LayoutChangeEvent, type NativeSyntheticEvent, type NativeScrollEvent, Alert, Pressable, Text as RNText } from 'react-native'
 // import { useLayout } from '@/utils/hooks'
 import { type Line, useLrcPlay, useLrcSet, useLxlyricWordPlay, getLxlyricWords, updateWordProgressByTime, isLxlyricEnabled, type WordData } from '@/plugins/lyric'
 import { createStyle } from '@/utils/tools'
@@ -12,6 +12,7 @@ import playerState from '@/store/player/state'
 import { useProgress } from '@/store/player/hook'
 import { scrollTo } from '@/utils/scroll'
 import PlayLine, { type PlayLineType } from '../components/PlayLine'
+import AnimatedPlayingWord from '../components/AnimatedPlayingWord'
 import Clipboard from '@react-native-clipboard/clipboard'
 import searchActions from '@/store/search/action'
 import { Navigation } from 'react-native-navigation'
@@ -79,6 +80,13 @@ const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, lxlyricWords
   const isActive = activeLine == lineNum
   const zoomScale = isZoomActiveLrc && isActive ? 1.15 : 1
 
+  // Word progress animation
+  const wordProgressAnim = useRef(new Animated.Value(0)).current
+  const rafRef = useRef<number | null>(null)
+  const progressRef = useRef({ nowPlayTime: 0, timestamp: Date.now() })
+  const [localWordIndex, setLocalWordIndex] = useState(-1)
+  const localWordIndexRef = useRef(-1)
+
   const colors = useMemo(() => {
     return isActive ? [
       theme['c-primary'],
@@ -90,6 +98,84 @@ const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, lxlyricWords
       0.6,
     ] as const
   }, [isActive, theme])
+
+  // Sync progress ref on render for RAF time estimation
+  progressRef.current.nowPlayTime = playerState.progress.nowPlayTime
+  progressRef.current.timestamp = Date.now()
+
+  // RAF loop for smooth word progress animation and local word tracking
+  useEffect(() => {
+    if (rafRef.current !== null) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+
+    // Reset local state
+    setLocalWordIndex(-1)
+    localWordIndexRef.current = -1
+    wordProgressAnim.setValue(0)
+
+    if (!lxlyricWords || !isActive || lxlyricWords.length === 0) return
+
+    const words = lxlyricWords
+    const lineTime = line.time
+    let running = true
+
+    const tick = () => {
+      if (!running) return
+      if (!playerState.isPlay) {
+        rafRef.current = requestAnimationFrame(tick)
+        return
+      }
+
+      // Sync progress reference when audio position updates
+      const latestNowPlayTime = playerState.progress.nowPlayTime
+      if (latestNowPlayTime !== progressRef.current.nowPlayTime) {
+        progressRef.current.nowPlayTime = latestNowPlayTime
+        progressRef.current.timestamp = Date.now()
+      }
+
+      // Estimate current audio time smoothly using wall-clock offset
+      const elapsed = Date.now() - progressRef.current.timestamp
+      const estimatedTime = progressRef.current.nowPlayTime * 1000 + elapsed
+      const elapsedInLine = estimatedTime - lineTime
+
+      // Find current word index locally at RAF frequency
+      let wi = -1
+      for (let i = words.length - 1; i >= 0; i--) {
+        if (elapsedInLine >= words[i].offset) {
+          wi = i
+          break
+        }
+      }
+
+      // Update word index (only trigger re-render on change)
+      if (wi !== localWordIndexRef.current) {
+        localWordIndexRef.current = wi
+        setLocalWordIndex(wi)
+      }
+
+      // Animate current word progress (0 → 1)
+      if (wi >= 0 && wi < words.length) {
+        const wordElapsed = elapsedInLine - words[wi].offset
+        wordProgressAnim.setValue(Math.min(1, Math.max(0, wordElapsed / words[wi].duration)))
+      } else {
+        wordProgressAnim.setValue(0)
+      }
+
+      rafRef.current = requestAnimationFrame(tick)
+    }
+
+    rafRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      running = false
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current)
+        rafRef.current = null
+      }
+    }
+  }, [isActive, lxlyricWords, wordProgressAnim, line.time])
 
   const handleLayout = ({ nativeEvent }: LayoutChangeEvent) => {
     onLayout(lineNum, nativeEvent.layout.height, nativeEvent.layout.width)
@@ -129,15 +215,28 @@ const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, lxlyricWords
         {lxlyricWords && isActive ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: textAlign === 'right' ? 'flex-end' : textAlign === 'center' ? 'center' : 'flex-start' }}>
             {lxlyricWords.map((word, wi) => {
-              const isPlayed = wi < lxlyricWordIndex
-              const isCurrent = wi === lxlyricWordIndex
+              const isPlayed = wi < localWordIndex
+              const isCurrent = wi === localWordIndex
+              if (isCurrent) {
+                return (
+                  <AnimatedPlayingWord
+                    key={wi}
+                    word={word}
+                    animValue={wordProgressAnim}
+                    playedColor={theme['c-primary']}
+                    unplayedColor={theme['c-350']}
+                    size={size}
+                    lineHeight={lineHeight}
+                  />
+                )
+              }
               return (
                 <RNText key={wi} textBreakStrategy="simple" style={{
                   fontSize: setSpText(size),
                   lineHeight,
-                  color: isPlayed ? theme['c-primary'] : isCurrent ? theme['c-primary'] : theme['c-350'],
-                  opacity: isPlayed ? 1 : isCurrent ? 1 : 0.6,
-                  fontWeight: isCurrent ? 'bold' : 'normal',
+                  color: isPlayed ? theme['c-primary'] : theme['c-350'],
+                  opacity: isPlayed ? 1 : 0.6,
+                  fontWeight: 'normal',
                 }}>{word.text}</RNText>
               )
             })}

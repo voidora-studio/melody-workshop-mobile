@@ -2,6 +2,7 @@ import { useMemo, useRef, useImperativeHandle, forwardRef, useState } from 'reac
 import { useI18n } from '@/lang'
 import Menu, { type MenuType, type Position } from '@/components/common/Menu'
 import { hasDislike } from '@/core/dislikeList'
+import downloadState from '@/store/download/state'
 
 export interface SelectInfo {
   musicInfo: LX.Music.MusicInfoOnline
@@ -14,6 +15,7 @@ const initSelectInfo = {}
 export interface ListMenuProps {
   onPlay: (selectInfo: SelectInfo) => void
   onPlayLater: (selectInfo: SelectInfo) => void
+  onDownload: (selectInfo: SelectInfo) => void
   onAdd: (selectInfo: SelectInfo) => void
   onCopyName: (selectInfo: SelectInfo) => void
   onMusicSourceDetail: (selectInfo: SelectInfo) => void
@@ -33,11 +35,13 @@ export default forwardRef<ListMenuType, ListMenuProps>((props: ListMenuProps, re
   const menuRef = useRef<MenuType>(null)
   const selectInfoRef = useRef<SelectInfo>(initSelectInfo as SelectInfo)
   const [isDislikeMusic, setDislikeMusic] = useState(false)
+  const [isAlreadyDownloaded, setAlreadyDownloaded] = useState(false)
 
   useImperativeHandle(ref, () => ({
     show(selectInfo, position) {
       selectInfoRef.current = selectInfo
       setDislikeMusic(hasDislike(selectInfo.musicInfo))
+      setAlreadyDownloaded(downloadState.list.some(item => item.metadata.musicInfo.id === selectInfo.musicInfo.id && item.status === 'completed'))
       if (visible) menuRef.current?.show(position)
       else {
         setVisible(true)
@@ -52,13 +56,13 @@ export default forwardRef<ListMenuType, ListMenuProps>((props: ListMenuProps, re
     return [
       { action: 'play', label: t('play') },
       { action: 'playLater', label: t('play_later') },
-      // { action: 'download', label: '下载' },
+      { action: 'download', label: t('download'), disabled: isAlreadyDownloaded },
       { action: 'add', label: t('add_to') },
       { action: 'copyName', label: t('copy_name') },
       { action: 'musicSourceDetail', label: t('music_source_detail') },
       { action: 'dislike', label: t('dislike'), disabled: isDislikeMusic },
     ] as const
-  }, [t, isDislikeMusic])
+  }, [t, isDislikeMusic, isAlreadyDownloaded])
 
   const handleMenuPress = ({ action }: typeof menus[number]) => {
     const selectInfo = selectInfoRef.current
@@ -68,6 +72,9 @@ export default forwardRef<ListMenuType, ListMenuProps>((props: ListMenuProps, re
         break
       case 'playLater':
         props.onPlayLater(selectInfo)
+        break
+      case 'download':
+        props.onDownload(selectInfo)
         break
       case 'add':
         props.onAdd(selectInfo)

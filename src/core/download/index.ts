@@ -50,11 +50,14 @@ const writeLrcFile = async(filePath: string, lrc: string, tlrc?: string | null, 
 
 const downloadOne = async(item: LX.Download.ListItem) => {
   try {
-    const url = await getMusicUrl({
-      musicInfo: item.metadata.musicInfo,
-      quality: item.metadata.quality,
-      isRefresh: false,
-    })
+    const url = await Promise.race([
+      getMusicUrl({
+        musicInfo: item.metadata.musicInfo,
+        quality: item.metadata.quality,
+        isRefresh: false,
+      }),
+      new Promise<string>((_resolve, _reject) => { setTimeout(() => _reject(new Error('获取链接超时')), 30000) }),
+    ])
 
     downloadActions.updateItem(item.id, { statusText: '下载中…' })
 
