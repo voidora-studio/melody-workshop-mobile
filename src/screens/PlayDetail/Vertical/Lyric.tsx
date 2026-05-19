@@ -1,7 +1,7 @@
-import { memo, useMemo, useEffect, useRef, useCallback, useState } from 'react'
+import { memo, useMemo, useEffect, useRef, useCallback } from 'react'
 import { Animated, View, FlatList, type FlatListProps, type LayoutChangeEvent, type NativeSyntheticEvent, type NativeScrollEvent, Alert, Pressable, Text as RNText } from 'react-native'
 // import { useLayout } from '@/utils/hooks'
-import { type Line, useLrcPlay, useLrcSet, useLxlyricWordPlay, getLxlyricWords, updateWordProgressByTime, isLxlyricEnabled, type WordData } from '@/plugins/lyric'
+import { type Line, useLrcSet, getLxlyricWords, isLxlyricEnabled, type WordData } from '@/plugins/lyric'
 import { createStyle } from '@/utils/tools'
 // import { useComponentIds } from '@/store/common/hook'
 import { useTheme } from '@/store/theme/hook'
@@ -9,7 +9,7 @@ import { useSettingValue } from '@/store/setting/hook'
 import { AnimatedColorText } from '@/components/common/Text'
 import { setSpText } from '@/utils/pixelRatio'
 import playerState from '@/store/player/state'
-import { useProgress } from '@/store/player/hook'
+import { useProgress, useIsPlay } from '@/store/player/hook'
 import { scrollTo } from '@/utils/scroll'
 import PlayLine, { type PlayLineType } from '../components/PlayLine'
 import AnimatedPlayingWord from '../components/AnimatedPlayingWord'
@@ -17,50 +17,8 @@ import Clipboard from '@react-native-clipboard/clipboard'
 import searchActions from '@/store/search/action'
 import { Navigation } from 'react-native-navigation'
 import commonState from '@/store/common/state'
-// import { screenkeepAwake } from '@/utils/nativeModules/utils'
-// import { log } from '@/utils/log'
-// import { toast } from '@/utils/tools'
 
 type FlatListType = FlatListProps<Line>
-
-// const useLock = () => {
-//   const showCommentRef = useRef(false)
-
-
-//   useEffect(() => {
-//     let appstateListener = AppState.addEventListener('change', (state) => {
-//       switch (state) {
-//         case 'active':
-//           if (showLyricRef.current && !showCommentRef.current) screenkeepAwake()
-//           break
-//         case 'background':
-//           screenUnkeepAwake()
-//           break
-//       }
-//     })
-//     return () => {
-//       appstateListener.remove()
-//     }
-//   }, [])
-//   useEffect(() => {
-//     let listener: ReturnType<typeof onNavigationComponentDidDisappearEvent>
-//     showCommentRef.current = !!componentIds.comment
-//     if (showCommentRef.current) {
-//       if (showLyricRef.current) screenUnkeepAwake()
-//       listener = onNavigationComponentDidDisappearEvent(componentIds.comment as string, () => {
-//         if (showLyricRef.current && AppState.currentState == 'active') screenkeepAwake()
-//       })
-//     }
-
-//     const rm = global.state_event.on('componentIdsUpdated', (ids) => {
-
-//     })
-
-//     return () => {
-//       if (listener) listener.remove()
-//     }
-//   }, [])
-// }
 
 interface LineProps {
   line: Line
@@ -69,9 +27,10 @@ interface LineProps {
   isZoomActiveLrc: boolean
   lxlyricWords: WordData[] | null
   lxlyricWordIndex: number
+  wordProgressAnim: Animated.Value
   onLayout: (lineNum: number, height: number, width: number) => void
 }
-const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, lxlyricWords, lxlyricWordIndex, onLayout }: LineProps) => {
+const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, lxlyricWords, lxlyricWordIndex, wordProgressAnim, onLayout }: LineProps) => {
   const theme = useTheme()
   const lrcFontSize = useSettingValue('playDetail.vertical.style.lrcFontSize')
   const textAlign = useSettingValue('playDetail.style.align')
@@ -79,13 +38,6 @@ const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, lxlyricWords
   const lineHeight = setSpText(size) * 1.3
   const isActive = activeLine == lineNum
   const zoomScale = isZoomActiveLrc && isActive ? 1.15 : 1
-
-  // Word progress animation
-  const wordProgressAnim = useRef(new Animated.Value(0)).current
-  const rafRef = useRef<number | null>(null)
-  const progressRef = useRef({ nowPlayTime: 0, timestamp: Date.now() })
-  const [localWordIndex, setLocalWordIndex] = useState(-1)
-  const localWordIndexRef = useRef(-1)
 
   const colors = useMemo(() => {
     return isActive ? [
@@ -99,88 +51,9 @@ const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, lxlyricWords
     ] as const
   }, [isActive, theme])
 
-  // Sync progress ref on render for RAF time estimation
-  progressRef.current.nowPlayTime = playerState.progress.nowPlayTime
-  progressRef.current.timestamp = Date.now()
-
-  // RAF loop for smooth word progress animation and local word tracking
-  useEffect(() => {
-    if (rafRef.current !== null) {
-      cancelAnimationFrame(rafRef.current)
-      rafRef.current = null
-    }
-
-    // Reset local state
-    setLocalWordIndex(-1)
-    localWordIndexRef.current = -1
-    wordProgressAnim.setValue(0)
-
-    if (!lxlyricWords || !isActive || lxlyricWords.length === 0) return
-
-    const words = lxlyricWords
-    const lineTime = line.time
-    let running = true
-
-    const tick = () => {
-      if (!running) return
-      if (!playerState.isPlay) {
-        rafRef.current = requestAnimationFrame(tick)
-        return
-      }
-
-      // Sync progress reference when audio position updates
-      const latestNowPlayTime = playerState.progress.nowPlayTime
-      if (latestNowPlayTime !== progressRef.current.nowPlayTime) {
-        progressRef.current.nowPlayTime = latestNowPlayTime
-        progressRef.current.timestamp = Date.now()
-      }
-
-      // Estimate current audio time smoothly using wall-clock offset
-      const elapsed = Date.now() - progressRef.current.timestamp
-      const estimatedTime = progressRef.current.nowPlayTime * 1000 + elapsed
-      const elapsedInLine = estimatedTime - lineTime
-
-      // Find current word index locally at RAF frequency
-      let wi = -1
-      for (let i = words.length - 1; i >= 0; i--) {
-        if (elapsedInLine >= words[i].offset) {
-          wi = i
-          break
-        }
-      }
-
-      // Update word index (only trigger re-render on change)
-      if (wi !== localWordIndexRef.current) {
-        localWordIndexRef.current = wi
-        setLocalWordIndex(wi)
-      }
-
-      // Animate current word progress (0 → 1)
-      if (wi >= 0 && wi < words.length) {
-        const wordElapsed = elapsedInLine - words[wi].offset
-        wordProgressAnim.setValue(Math.min(1, Math.max(0, wordElapsed / words[wi].duration)))
-      } else {
-        wordProgressAnim.setValue(0)
-      }
-
-      rafRef.current = requestAnimationFrame(tick)
-    }
-
-    rafRef.current = requestAnimationFrame(tick)
-
-    return () => {
-      running = false
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current)
-        rafRef.current = null
-      }
-    }
-  }, [isActive, lxlyricWords, wordProgressAnim, line.time])
-
   const handleLayout = ({ nativeEvent }: LayoutChangeEvent) => {
     onLayout(lineNum, nativeEvent.layout.height, nativeEvent.layout.width)
   }
-
 
   // textBreakStrategy="simple" 用于解决某些设备上字体被截断的问题
   // https://stackoverflow.com/a/72822360
@@ -215,8 +88,8 @@ const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, lxlyricWords
         {lxlyricWords && isActive ? (
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: textAlign === 'right' ? 'flex-end' : textAlign === 'center' ? 'center' : 'flex-start' }}>
             {lxlyricWords.map((word, wi) => {
-              const isPlayed = wi < localWordIndex
-              const isCurrent = wi === localWordIndex
+              const isPlayed = wi < lxlyricWordIndex
+              const isCurrent = wi === lxlyricWordIndex
               if (isCurrent) {
                 return (
                   <AnimatedPlayingWord
@@ -266,7 +139,8 @@ const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, lxlyricWords
   if (isPrevActive !== isNextActive) return false
   if (isNextActive) {
     return prevProps.lxlyricWordIndex === nextProps.lxlyricWordIndex &&
-      prevProps.line === nextProps.line
+      prevProps.line === nextProps.line &&
+      prevProps.wordProgressAnim === nextProps.wordProgressAnim
   }
   return prevProps.line === nextProps.line &&
     prevProps.activeLine != nextProps.lineNum &&
@@ -274,15 +148,115 @@ const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, lxlyricWords
 })
 const wait = async() => new Promise(resolve => setTimeout(resolve, 100))
 
+// Compute active line index from audio progress instead of relying on lrc-file-parser's internal timer
+const useActiveLine = (lyricLines: Line[]) => {
+  const progress = useProgress()
+  const isPlay = useIsPlay()
+  return useMemo(() => {
+    if (!lyricLines.length || !isPlay) return -1
+    const currentTimeMs = progress.nowPlayTime * 1000
+    for (let i = lyricLines.length - 1; i >= 0; i--) {
+      if (currentTimeMs >= lyricLines[i].time) {
+        return i
+      }
+    }
+    return -1
+  }, [lyricLines, progress.nowPlayTime, isPlay])
+}
+
+// Compute word index from audio progress
+const useActiveWordIndex = (activeLine: number, lyricLines: Line[]) => {
+  const progress = useProgress()
+  const isPlay = useIsPlay()
+  return useMemo(() => {
+    if (!isLxlyricEnabled() || activeLine < 0 || !lyricLines.length || !isPlay) return -1
+    const words = getLxlyricWords(activeLine)
+    if (!words || words.length === 0) return -1
+    const currentTimeMs = progress.nowPlayTime * 1000
+    const lineTime = lyricLines[activeLine]?.time ?? 0
+    const elapsedInLine = currentTimeMs - lineTime
+    if (elapsedInLine < 0) return -1
+    for (let i = words.length - 1; i >= 0; i--) {
+      if (elapsedInLine >= words[i].offset) return i
+    }
+    return -1
+  }, [activeLine, lyricLines, progress.nowPlayTime, isPlay])
+}
+
 export default () => {
   const lyricLines = useLrcSet()
-  const { line } = useLrcPlay()
-  const { lineNum: lxlyricLineNum, wordIndex: lxlyricWordIndex } = useLxlyricWordPlay()
+  const line = useActiveLine(lyricLines)
+  const lxlyricWordIndex = useActiveWordIndex(line, lyricLines)
+  // lxlyricWords for the active line (for RAF word animation)
   const lxlyricWords = useMemo(() => {
-    if (lxlyricLineNum < 0) return null
-    return getLxlyricWords(lxlyricLineNum)
+    if (line < 0) return null
+    return getLxlyricWords(line)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lxlyricLineNum, lyricLines])
+  }, [line, lyricLines])
+
+  // Single parent-level RAF loop for smooth word progress animation
+  const wordProgressAnim = useRef(new Animated.Value(0)).current
+  const wordRafRef = useRef<number | null>(null)
+  const isPlay = useIsPlay()
+
+  useEffect(() => {
+    let running = true
+
+    if (!isPlay || line < 0 || !lxlyricWords || lxlyricWords.length === 0) {
+      wordProgressAnim.setValue(0)
+      return
+    }
+
+    const lineTime = lyricLines[line]?.time ?? 0
+    let lastSyncTime = playerState.progress.nowPlayTime
+    let lastSyncWall = Date.now()
+
+    const tick = () => {
+      if (!running) return
+
+      // Read latest progress directly from store (always fresh)
+      const currentStoreTime = playerState.progress.nowPlayTime
+      if (currentStoreTime !== lastSyncTime) {
+        lastSyncTime = currentStoreTime
+        lastSyncWall = Date.now()
+      }
+
+      // Smooth time estimation using wall clock between store updates
+      const estimatedMs = lastSyncTime * 1000 + (Date.now() - lastSyncWall)
+      const elapsedInLine = estimatedMs - lineTime
+
+      if (elapsedInLine >= 0) {
+        let wi = -1
+        for (let i = lxlyricWords.length - 1; i >= 0; i--) {
+          if (elapsedInLine >= lxlyricWords[i].offset) {
+            wi = i
+            break
+          }
+        }
+        if (wi >= 0) {
+          const wordElapsed = estimatedMs - lineTime - lxlyricWords[wi].offset
+          wordProgressAnim.setValue(Math.min(1, Math.max(0, wordElapsed / lxlyricWords[wi].duration)))
+        } else {
+          wordProgressAnim.setValue(0)
+        }
+      } else {
+        wordProgressAnim.setValue(0)
+      }
+
+      wordRafRef.current = requestAnimationFrame(tick)
+    }
+
+    wordRafRef.current = requestAnimationFrame(tick)
+
+    return () => {
+      running = false
+      if (wordRafRef.current !== null) {
+        cancelAnimationFrame(wordRafRef.current)
+        wordRafRef.current = null
+      }
+    }
+  }, [line, isPlay, lxlyricWords, wordProgressAnim, lyricLines])
+
   const flatListRef = useRef<FlatList>(null)
   const playLineRef = useRef<PlayLineType>(null)
   const isPauseScrollRef = useRef(true)
@@ -296,23 +270,10 @@ export default () => {
   const isShowLyricProgressSetting = useSettingValue('playDetail.isShowLyricProgressSetting')
   const isZoomActiveLrc = useSettingValue('playDetail.isZoomActiveLrc')
   const lyricDelayScroll = useSettingValue('playDetail.lyricDelayScroll')
-  // useLock()
-  // const [imgUrl, setImgUrl] = useState(null)
-  // const theme = useGetter('common', 'theme')
-  // const { onLayout, ...layout } = useLayout()
 
-  // useEffect(() => {
-  //   const url = playMusicInfo ? playMusicInfo.musicInfo.img : null
-  //   if (imgUrl == url) return
-  //   setImgUrl(url)
-  // // eslint-disable-next-line react-hooks/exhaustive-deps
-  // }, [playMusicInfo])
-
-  // const imgWidth = useMemo(() => layout.width * 0.75, [layout.width])
   const handleScrollToActive = (index = lineRef.current.line) => {
     if (index < 0) return
     if (flatListRef.current) {
-      // console.log('handleScrollToActive', index)
       if (scrollInfoRef.current && lineRef.current.line - lineRef.current.prevLine == 1) {
         let offset = listLayoutInfoRef.current.spaceHeight
         for (let line = 0; line < index; line++) {
@@ -390,7 +351,6 @@ export default () => {
   }, [])
 
   useEffect(() => {
-    // linesRef.current = lyricLines
     listLayoutInfoRef.current.lineHeights = []
     lineRef.current.prevLine = 0
     lineRef.current.line = 0
@@ -444,13 +404,6 @@ export default () => {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isShowLyricProgressSetting])
 
-  // Word-level lyric progress tracking
-  const progress = useProgress()
-  useEffect(() => {
-    if (!isLxlyricEnabled() || !playerState.isPlay) return
-    updateWordProgressByTime(progress.nowPlayTime * 1000)
-  }, [progress.nowPlayTime])
-
   const handleScrollToIndexFailed: FlatListType['onScrollToIndexFailed'] = (info) => {
     void wait().then(() => {
       handleScrollToActive(info.index)
@@ -478,6 +431,7 @@ export default () => {
       <LrcLine line={item} lineNum={index} activeLine={line} isZoomActiveLrc={isZoomActiveLrc}
         lxlyricWords={isActive ? lxlyricWords : null}
         lxlyricWordIndex={isActive ? lxlyricWordIndex : -1}
+        wordProgressAnim={wordProgressAnim}
         onLayout={handleLineLayout} />
     )
   }

@@ -16,13 +16,9 @@ const abis = [
 
 const address = [
   [`https://raw.githubusercontent.com/${GITHUB_OWNER}/${APP_NAME}/master/publish/version.json`, 'direct'],
-  ['https://registry.npmjs.org/lx-music-mobile-version-info/latest', 'npm'],
   [`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${APP_NAME}/publish/version.json`, 'direct'],
   [`https://fastly.jsdelivr.net/gh/${GITHUB_OWNER}/${APP_NAME}/publish/version.json`, 'direct'],
   [`https://gcore.jsdelivr.net/gh/${GITHUB_OWNER}/${APP_NAME}/publish/version.json`, 'direct'],
-  ['https://registry.npmmirror.com/lx-music-mobile-version-info/latest', 'npm'],
-  ['https://gitee.com/lyswhut/lx-music-mobile-versions/raw/master/version.json', 'direct'],
-  ['http://cdn.stsky.cn/lx-music/mobile/version.json', 'direct'],
 ]
 
 

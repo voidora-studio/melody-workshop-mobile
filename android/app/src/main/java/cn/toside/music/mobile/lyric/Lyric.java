@@ -23,6 +23,8 @@ public class Lyric extends LyricPlayer {
   ReactApplicationContext reactAppContext;
 
   boolean isRunPlayer = false;
+  boolean isSingleLine = false;
+  int maxLineNum = 5;
   // String lastText = "LX Music ^-^";
   int lastLine = 0;
   List lines = new ArrayList();
@@ -142,13 +144,37 @@ public class Lyric extends LyricPlayer {
   private void handleGetCurrentLyric(int lineNum) {
     lastLine = lineNum;
     if (lineNum >= 0 && lineNum < lines.size()) {
-      HashMap line = (HashMap) lines.get(lineNum);
-      if (line != null) {
-        setCurrentLyric((String) line.get("text"), (ArrayList<String>) line.get("extendedLyrics"));
+      if (isSingleLine) {
+        HashMap line = (HashMap) lines.get(lineNum);
+        if (line != null) {
+          setCurrentLyric((String) line.get("text"), (ArrayList<String>) line.get("extendedLyrics"));
+          return;
+        }
+      } else {
+        setCurrentLyric(buildMultiLineLyric(lineNum), new ArrayList<String>(0));
         return;
       }
     }
     setCurrentLyric("", new ArrayList<>(0));
+  }
+
+  private String buildMultiLineLyric(int activeLineNum) {
+    int size = lines.size();
+    if (size == 0) return "";
+
+    int half = maxLineNum / 2;
+    int startLine = Math.max(0, activeLineNum - half);
+    int endLine = Math.min(size - 1, startLine + maxLineNum - 1);
+    startLine = Math.max(0, endLine - maxLineNum + 1);
+
+    StringBuilder sb = new StringBuilder();
+    for (int i = startLine; i <= endLine; i++) {
+      HashMap line = (HashMap) lines.get(i);
+      if (line == null) continue;
+      if (sb.length() > 0) sb.append("\n");
+      sb.append((String) line.get("text"));
+    }
+    return sb.toString();
   }
 
   public void setSendLyricTextEvent(boolean isSend) {
@@ -166,6 +192,10 @@ public class Lyric extends LyricPlayer {
     if (isShowLyricView) return;
     if (lyricEvent == null) lyricEvent = new LyricEvent(reactAppContext);
     isShowLyricView = true;
+
+    isSingleLine = options.getBoolean("isSingleLine", isSingleLine);
+    maxLineNum = (int) options.getDouble("maxLineNum", maxLineNum);
+
     if (lyricView == null) lyricView = new LyricView(reactAppContext, lyricEvent);
     try {
       lyricView.showLyricView(options);
@@ -236,8 +266,10 @@ public class Lyric extends LyricPlayer {
   }
 
   public void setMaxLineNum(int maxLineNum) {
+    this.maxLineNum = maxLineNum;
     if (lyricView == null) return;
     lyricView.setMaxLineNum(maxLineNum);
+    if (isRunPlayer && !isSingleLine) handleGetCurrentLyric(lastLine);
   }
 
   public void setWidth(int width) {
@@ -246,8 +278,10 @@ public class Lyric extends LyricPlayer {
   }
 
   public void setSingleLine(boolean singleLine) {
+    this.isSingleLine = singleLine;
     if (lyricView == null) return;
     lyricView.setSingleLine(singleLine);
+    if (isRunPlayer) handleGetCurrentLyric(lastLine);
   }
 
   public void setShowToggleAnima(boolean showToggleAnima) {

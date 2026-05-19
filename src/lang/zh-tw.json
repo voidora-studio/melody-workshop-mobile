@@ -404,7 +404,7 @@
   "setting_player": "播放設定",
   "setting_player_save_play_time": "記住播放進度",
   "setting_player_auto_skip_on_error": "播放錯誤時自動跳過",
-  "setting_player_is_play_lxlrc": "播放 KX 歌詞",
+  "setting_player_is_play_lxlrc": "逐字歌詞動畫",
   "setting_player_swap_lyric_translation_and_roma": "調換翻譯歌詞與羅馬音歌詞位置",
   "setting_player_is_mute": "靜音",
   "setting_search": "搜尋設定",
@@ -582,6 +582,8 @@
   "setting_play_detail_progress_style_full": "全寬",
 
   "setting_download_save_path": "下載儲存路徑",
+  "setting_download_save_path_browse": "選擇目錄",
+  "setting_download_save_path_reset": "重置",
   "setting_download_group_by_list": "按列表名稱分組儲存",
   "setting_download_embed_cover": "在音訊檔案中嵌入封面圖",
   "setting_download_embed_lyric": "在音訊檔案中嵌入歌詞",

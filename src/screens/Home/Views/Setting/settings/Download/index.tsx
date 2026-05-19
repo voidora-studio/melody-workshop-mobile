@@ -7,6 +7,7 @@ import IsSkipExistFile from './IsSkipExistFile'
 import IsDownloadLrc from './IsDownloadLrc'
 import IsUseOtherSource from './IsUseOtherSource'
 import DownloadQuality from './DownloadQuality'
+import SavePath from './SavePath'
 import IsGroupByList from './IsGroupByList'
 import LyricEncoding from './LyricEncoding'
 import IsEmbedCover from './IsEmbedCover'
@@ -25,6 +26,7 @@ export default memo(() => {
       <DownloadFileName />
       <MaxDownloadNum />
       <IsSkipExistFile />
+      <SavePath />
       <IsDownloadLrc />
       <LyricEncoding />
       <IsUseOtherSource />

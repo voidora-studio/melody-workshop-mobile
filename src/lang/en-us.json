@@ -404,7 +404,7 @@
   "setting_player": "Playback",
   "setting_player_save_play_time": "Remember playback progress",
   "setting_player_auto_skip_on_error": "Auto-skip on playback error",
-  "setting_player_is_play_lxlrc": "Play KX Lyrics",
+  "setting_player_is_play_lxlrc": "Word-by-word lyric animation",
   "setting_player_swap_lyric_translation_and_roma": "Swap lyric translation and roma position",
   "setting_player_is_mute": "Mute",
   "setting_search": "Search",
@@ -582,6 +582,8 @@
   "setting_play_detail_progress_style_full": "Full",
 
   "setting_download_save_path": "Download save path",
+  "setting_download_save_path_browse": "Browse",
+  "setting_download_save_path_reset": "Reset",
   "setting_download_group_by_list": "Group save by list name",
   "setting_download_embed_cover": "Embed cover art in audio file",
   "setting_download_embed_lyric": "Embed lyrics in audio file",

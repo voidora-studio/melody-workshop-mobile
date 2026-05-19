@@ -11,45 +11,14 @@ export interface ChangeLogModalType {
 
 const changeLogs = [
   {
-    version: 'v1.8.4',
-    date: '2025-05',
+    version: 'v1.0.0',
+    date: '2026-05',
     items: [
-      '优化媒体信息设置',
-      '修复若干问题',
-    ],
-  },
-  {
-    version: 'v1.8.3',
-    date: '2025-04',
-    items: [
-      '优化歌词缓存',
-      '修复若干问题',
-    ],
-  },
-  {
-    version: 'v1.8.2',
-    date: '2025-03',
-    items: [
-      '新增播放倍速功能',
-      '新增定时停止播放功能',
-      '优化歌词显示',
-    ],
-  },
-  {
-    version: 'v1.8.1',
-    date: '2025-02',
-    items: [
-      '修复若干问题',
-      '优化用户体验',
-    ],
-  },
-  {
-    version: 'v1.8.0',
-    date: '2025-01',
-    items: [
-      '新增数据同步功能',
-      '新增下载管理功能',
-      '支持多音源切换',
+      '旋律工坊移动版初始发布',
+      '基于 LX Music Mobile 重构',
+      '全新 Melody Workshop 主题包',
+      '优化逐字歌词动画与显示',
+      '优化播放体验',
     ],
   },
 ]

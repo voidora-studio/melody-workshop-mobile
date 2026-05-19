@@ -1,6 +1,6 @@
 import RNFS from 'react-native-fs'
 import { getMusicUrl } from '@/core/music'
-import { downloadFile, stopDownload, mkdir, existsFile, writeFile, privateStorageDirectoryPath } from '@/utils/fs'
+import { downloadFile, stopDownload, mkdir, existsFile, writeFile, externalStorageDirectoryPath } from '@/utils/fs'
 import settingState from '@/store/setting/state'
 import downloadActions from '@/store/download/action'
 import listState from '@/store/list/state'
@@ -26,7 +26,7 @@ const getListName = (listId?: string): string | null => {
 }
 
 const getDownloadPath = async(musicInfo: LX.Music.MusicInfoOnline, ext: string, listId?: string): Promise<string> => {
-  const baseDir = settingState.setting['download.savePath'] || `${privateStorageDirectoryPath}/download`
+  const baseDir = settingState.setting['download.savePath'] || `${externalStorageDirectoryPath}/Download/MelodyWorkshop`
   const listName = settingState.setting['download.groupByList'] ? getListName(listId) : null
   const dir = listName ? `${baseDir}/${listName}` : baseDir
   const exists = await existsFile(dir)
