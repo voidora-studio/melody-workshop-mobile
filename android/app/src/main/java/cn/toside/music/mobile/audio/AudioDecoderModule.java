@@ -165,7 +165,7 @@ public class AudioDecoderModule extends ReactContextBaseJavaModule {
           sawOutputEOS = true;
         }
       } else if (outputBufIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED) {
-        // Format changed — codec output format is now available
+        codecOutputBuffers = codec.getOutputBuffers();
       }
     }
 

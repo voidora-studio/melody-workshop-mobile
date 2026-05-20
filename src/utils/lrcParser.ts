@@ -5,8 +5,10 @@ import { generateUniformWords } from './lxlyricParser'
  * Convert raw LRC text into uniform word-level timing data.
  * Each character in a line gets an equal share of the line duration.
  * Used as fallback when precise word timings are unavailable.
+ *
+ * Export name matches the spec requirement (convertLrcToAmllFallback).
  */
-export const convertLrcToUniformLyricLines = (lrcText: string): LyricLine[] => {
+function _toUniform(lrcText: string): LyricLine[] {
   if (!lrcText) return []
 
   const timeRxp = /\[(\d{1,3}):(\d{2})\.(\d{1,3})]/g
@@ -49,3 +51,9 @@ export const convertLrcToUniformLyricLines = (lrcText: string): LyricLine[] => {
     }
   })
 }
+
+/** Spec-required name */
+export const convertLrcToAmllFallback = _toUniform
+
+/** Descriptive name for internal use */
+export const convertLrcToUniformLyricLines = _toUniform

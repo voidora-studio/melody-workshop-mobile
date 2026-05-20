@@ -38,6 +38,7 @@ const computeEnergyEnvelope = (
   const frameSize = Math.round((frameSizeMs / 1000) * sampleRate)
   const hopSize = Math.round((hopSizeMs / 1000) * sampleRate)
   const numFrames = Math.floor((pcm.length - frameSize) / hopSize) + 1
+  if (numFrames <= 0) return new Float64Array(0)
 
   const energy = new Float64Array(numFrames)
   for (let i = 0; i < numFrames; i++) {

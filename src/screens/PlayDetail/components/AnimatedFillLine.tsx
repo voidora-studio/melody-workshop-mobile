@@ -3,6 +3,7 @@ import { Text } from 'react-native'
 import { setSpText } from '@/utils/pixelRatio'
 import type { WordData } from '@/utils/lxlyricParser'
 import playerState from '@/store/player/state'
+import { useIsPlay } from '@/store/player/hook'
 
 interface Props {
   words: WordData[]
@@ -13,76 +14,107 @@ interface Props {
   lineHeight: number
 }
 
+const parseColor = (color: string): { r: number; g: number; b: number } | null => {
+  const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(color)
+  if (rgb) return { r: +rgb[1], g: +rgb[2], b: +rgb[3] }
+  const hex = /^#?([\da-f]{3,8})/i.exec(color)
+  if (hex) {
+    let h = hex[1]
+    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]
+    if (h.length >= 6) return { r: parseInt(h[0] + h[1], 16), g: parseInt(h[2] + h[3], 16), b: parseInt(h[4] + h[5], 16) }
+  }
+  return null
+}
+
 const interpolateColor = (color1: string, color2: string, ratio: number): string => {
-  const hex1 = color1.replace('#', '')
-  const hex2 = color2.replace('#', '')
-  const r1 = parseInt(hex1.substring(0, 2), 16)
-  const g1 = parseInt(hex1.substring(2, 4), 16)
-  const b1 = parseInt(hex1.substring(4, 6), 16)
-  const r2 = parseInt(hex2.substring(0, 2), 16)
-  const g2 = parseInt(hex2.substring(2, 4), 16)
-  const b2 = parseInt(hex2.substring(4, 6), 16)
-  const r = Math.round(r1 + (r2 - r1) * ratio)
-  const g = Math.round(g1 + (g2 - g1) * ratio)
-  const b = Math.round(b1 + (b2 - b1) * ratio)
+  const c1 = parseColor(color1)
+  const c2 = parseColor(color2)
+  if (!c1 || !c2) return color1
+  const r = Math.round(c1.r + (c2.r - c1.r) * ratio)
+  const g = Math.round(c1.g + (c2.g - c1.g) * ratio)
+  const b = Math.round(c1.b + (c2.b - c1.b) * ratio)
   return `rgb(${r},${g},${b})`
 }
 
-// Creates a wavefront effect: a single ~1-char-wide transition sweeps
-// left-to-right. Characters before the wave are fully lit, characters
-// after are dim, and the character at the wavefront is mid-transition.
-// This matches the Apple Music lyric fill style.
+/**
+ * Apple Music-style wavefront fill animation for the active lyric line.
+ *
+ * Uses wall-clock advance during playback for smooth 60fps animation
+ * independent of player progress event frequency. Player time is only
+ * consulted to catch up (forward seek) or detect backward seeks
+ * (>1s drop) — never to slow down the display, preventing the
+ * freeze-then-jump bug that plagued the previous implementation.
+ *
+ * react-native-transcript-karaoke's Karaoke component cannot achieve
+ * inline per-character fill animation because it renders each chunk
+ * as a sibling <Text> element (each on its own line). This component
+ * renders all characters of one line inline with a smooth gradient
+ * wavefront transition (WAVE_WIDTH = 2 chars for CJK readability).
+ */
 const AnimatedFillWords = memo(({ words, lineTime, playedColor, unplayedColor, size, lineHeight }: Props) => {
-  const initialTimeMs = playerState.progress.nowPlayTime * 1000
-  const [currentMs, setCurrentMs] = useState(initialTimeMs)
-  const currentMsRef = useRef(initialTimeMs)
-  const rafRef = useRef<number | null>(null)
-  const runningRef = useRef(true)
+  const isPlay = useIsPlay()
 
+  // Progress in ms — RAF wall-clock tracking eliminates freeze/jank
+  const [displayMs, setDisplayMs] = useState(() => Math.round(playerState.progress.nowPlayTime * 1000))
+  const displayMsRef = useRef(displayMs)
+  const rafRef = useRef<number | null>(null)
+
+  // ── RAF loop: wall-clock advance, player sync only on seek ────────
   useEffect(() => {
-    runningRef.current = true
-    let lastSyncTime = playerState.progress.nowPlayTime
-    let lastSyncWall = Date.now()
-    const seedMs = lastSyncTime * 1000
-    currentMsRef.current = Math.max(currentMsRef.current, seedMs)
-    setCurrentMs(currentMsRef.current)
+    if (!isPlay) {
+      const ms = Math.round(playerState.progress.nowPlayTime * 1000)
+      displayMsRef.current = ms
+      setDisplayMs(ms)
+      return
+    }
+
+    const nowMs = Math.round(playerState.progress.nowPlayTime * 1000)
+    if (nowMs > displayMsRef.current) displayMsRef.current = nowMs
+    let lastWall = Date.now()
+    let lastPlayerMs = nowMs
 
     const tick = () => {
-      if (!runningRef.current) return
-      const storeTime = playerState.progress.nowPlayTime
-      if (storeTime !== lastSyncTime) {
-        lastSyncTime = storeTime
-        lastSyncWall = Date.now()
+      const now = Date.now()
+      const dt = now - lastWall
+      lastWall = now
+
+      // If RAF was paused (app backgrounded), dt can be huge — re-sync from player instead
+      if (dt > 200) {
+        displayMsRef.current = Math.round(playerState.progress.nowPlayTime * 1000)
+      } else {
+        // Advance by real wall-clock delta (= audio time during normal playback)
+        displayMsRef.current += dt
       }
-      // Stop wall-clock drift when paused; never go backward
-      const estimatedMs = playerState.isPlay
-        ? lastSyncTime * 1000 + (Date.now() - lastSyncWall)
-        : lastSyncTime * 1000
-      if (estimatedMs > currentMsRef.current) {
-        currentMsRef.current = estimatedMs
-        setCurrentMs(estimatedMs)
-      } else if (!playerState.isPlay) {
-        // Paused: still sync to store time if it changed
-        currentMsRef.current = estimatedMs
-        setCurrentMs(estimatedMs)
+
+      // Sync with player — only forward (forward seek) or detectible backward seek
+      const playerMs = Math.round(playerState.progress.nowPlayTime * 1000)
+
+      if (playerMs > lastPlayerMs + 100) {
+        // Player advanced (progress update or forward seek)
+        if (playerMs > displayMsRef.current) displayMsRef.current = playerMs
+      } else if (playerMs < lastPlayerMs - 1000) {
+        // Backward seek detected (> 1 s drop)
+        displayMsRef.current = playerMs
+        lastWall = now
       }
+
+      lastPlayerMs = playerMs
+      setDisplayMs(displayMsRef.current)
       rafRef.current = requestAnimationFrame(tick)
     }
 
     rafRef.current = requestAnimationFrame(tick)
-
     return () => {
-      runningRef.current = false
       if (rafRef.current !== null) {
         cancelAnimationFrame(rafRef.current)
         rafRef.current = null
       }
     }
-  }, [lineTime, words])
+  }, [isPlay])
 
+  // ── Characters & wavefront computation ────────────────────────────
   const fontSize = setSpText(size)
 
-  // Expand words into individual characters
   const { chars, lineEnd } = useMemo(() => {
     let maxEnd = 0
     const c = words.flatMap(word => {
@@ -97,22 +129,16 @@ const AnimatedFillWords = memo(({ words, lineTime, playedColor, unplayedColor, s
     return { chars: c, lineEnd: lineTime + maxEnd }
   }, [words, lineTime])
 
-  // Total line duration, clamped to avoid divide-by-zero
   const lineDuration = Math.max(100, lineEnd - lineTime)
-  // Normalised line progress [0, 1]
-  const lineProgress = Math.min(1, Math.max(0, (currentMs - lineTime) / lineDuration))
-  // Number of characters the wavefront spans (1 = razor-sharp, larger = softer)
-  const WAVE_WIDTH = 1.2
+  const lineProgress = Math.min(1, Math.max(0, (displayMs - lineTime) / lineDuration))
+  const WAVE_WIDTH = 2.0 // characters — wider wavefront for smoother CJK transition
   const totalChars = chars.length
 
   return (
     <Text textBreakStrategy="simple" style={{ fontSize, lineHeight }}>
       {chars.map((char, i) => {
-        // Normalised wave position: 0..totalChars
         const wavePos = lineProgress * totalChars
-        // Distance from wave centre to this character (chars)
         const distance = wavePos - i
-        // Clamp to [0, 1] with a transition window of WAVE_WIDTH chars
         let charProgress = 0
         if (distance >= WAVE_WIDTH / 2) {
           charProgress = 1

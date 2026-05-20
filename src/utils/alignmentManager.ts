@@ -92,19 +92,35 @@ export const getLyricsDataProgressive = async(
   let alignedLines: LyricLine[] | null = null
 
   if (audioFilePath) {
+    // Spec: timeout 超时降级（默认 15s）
+    let timedOut = false
+    const timeoutId = setTimeout(() => {
+      timedOut = true
+      console.warn('[alignmentManager] Alignment timeout (' + timeout + 'ms) — keeping uniform fallback')
+    }, timeout)
+
     try {
       const { pcm, sampleRate } = await decodeAudioToPCM(audioFilePath)
-      const lineInputs = parseLrcToLineInputs(lrcText)
+      if (!timedOut) {
+        const lineInputs = parseLrcToLineInputs(lrcText)
 
-      if (lineInputs.length > 0 && pcm.length > 0) {
-        const aligned = forcedAlign(lineInputs, pcm, sampleRate, (index, line) => {
-          const ll = alignedToLyricLine(line)
-          options?.onLineReady?.(index, ll)
-        })
-        alignedLines = aligned.map(alignedToLyricLine)
+        if (lineInputs.length > 0 && pcm.length > 0) {
+          const aligned = forcedAlign(lineInputs, pcm, sampleRate, (index, line) => {
+            if (timedOut) return
+            const ll = alignedToLyricLine(line)
+            options?.onLineReady?.(index, ll)
+          })
+          if (!timedOut) {
+            alignedLines = aligned.map(alignedToLyricLine)
+          }
+        }
       }
     } catch (err) {
-      console.warn('[alignmentManager] Forced alignment failed, using uniform fallback:', err)
+      if (!timedOut) {
+        console.warn('[alignmentManager] Forced alignment failed, using uniform fallback:', err)
+      }
+    } finally {
+      clearTimeout(timeoutId)
     }
   }
 
