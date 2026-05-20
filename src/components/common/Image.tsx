@@ -24,12 +24,11 @@ export const defaultHeaders = {
 const EmptyPic = memo(({ style, nativeID }: { style: ImageProps['style'], nativeID: ImageProps['nativeID'] }) => {
   const theme = useTheme()
   const { onLayout, width } = useLayout()
-  const size = width * 0.36
+  const size = width * 0.5
 
   return (
-    <View style={StyleSheet.compose({ ...styles.emptyPic, backgroundColor: theme['c-primary-light-900-alpha-200'], gap: size * 0.1 }, style)} onLayout={onLayout} nativeID={nativeID}>
-      <Text size={size} color={theme['c-primary-light-400-alpha-200']}>L</Text>
-      <Text size={size} color={theme['c-primary-light-400-alpha-200']} style={styles.text}>X</Text>
+    <View style={StyleSheet.compose({ ...styles.emptyPic, backgroundColor: theme['c-primary-light-900-alpha-200'] }, style)} onLayout={onLayout} nativeID={nativeID}>
+      <Text size={size} color={theme['c-primary-light-400-alpha-200']}>♪</Text>
     </View>
   )
 })
@@ -87,8 +86,5 @@ const styles = createStyle({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  text: {
-    paddingLeft: 2,
   },
 })

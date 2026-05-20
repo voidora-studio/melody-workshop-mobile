@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import Lyric, { type Lines } from 'lrc-file-parser'
 import settingState from '@/store/setting/state'
-import { buildLxlyricMap, type WordData } from '@/utils/lxlyricParser'
-export type { WordData }
+import { buildLxlyricMap, parseLxlyric, type WordData, type ParsedLxlyricLine } from '@/utils/lxlyricParser'
+export type { WordData, ParsedLxlyricLine }
 export type Line = Lines[number]
 type PlayHook = (line: number, text: string) => void
 type SetLyricHook = (lines: Lines) => void
@@ -10,6 +10,8 @@ type WordPlayHook = (lineNum: number, wordIndex: number) => void
 
 // word data map: line start time -> WordData[]
 let lxlyricWordsMap: Map<number, WordData[]> = new Map()
+// parsed lxlyric lines for display (full sentence per line)
+let lxlyricLines: ParsedLxlyricLine[] = []
 
 const lrcTools = {
   isInited: false,
@@ -125,12 +127,16 @@ export const setLyric = (lyric: string, translation?: string, romalrc?: string) 
 }
 
 export const setLxlyric = (lxlyric: string) => {
+  lxlyricLines = lxlyric ? parseLxlyric(lxlyric) : []
   lxlyricWordsMap = buildLxlyricMap(lxlyric)
   lrcTools.isPlayLxlrc = !!lxlyric && settingState.setting['player.isPlayLxlrc']
   if (!lxlyric || lxlyricWordsMap.size === 0) {
     lrcTools.isPlayLxlrc = false
   }
+  console.log('[lxlyric] setLxlyric:', !!lxlyric, 'lines:', lxlyricLines.length, 'mapSize:', lxlyricWordsMap.size, 'isPlayLxlrc:', lrcTools.isPlayLxlrc)
 }
+
+export const getLxlyricLines_ = (): ParsedLxlyricLine[] => lxlyricLines
 
 export const updateWordProgress = (lineNum: number, currentTimeMs: number) => {
   if (!lrcTools.isPlayLxlrc) return

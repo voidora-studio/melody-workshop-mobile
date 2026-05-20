@@ -33,6 +33,15 @@ npx tsc --noEmit
 npm run clear       # gradlew clean
 ```
 
+### Build Checklist
+
+Before each build, increment version numbers in these files:
+
+1. `package.json` — increment `version` (semver string) and `versionCode` (integer)
+2. `publish/version.json` — update `version` to match `package.json`
+
+`versionCode` is a monotonically increasing integer (1, 2, 3...). `version` follows semver (`major.minor.patch`). Bump minor for new features, patch for bug fixes, major for breaking changes. Keep both files in sync — `android/app/build.gradle` reads `versionCode` and `version` from `package.json`, and `publish/version.json` is what the update checker fetches remotely.
+
 ## Architecture Overview
 
 ### Framework
@@ -120,71 +129,6 @@ npm run menu
 - Debug builds skip JS bundling — requires Metro server
 - `ANDROID_HOME` or `local.properties` must point to the SDK
 
-## Development Roadmap — Completed Features (✅) / Pending (⬜)
-
-The following features from lx-music-desktop have been ported to mobile.
-
-### ✅ Priority 1 — High Impact, Low Effort (全部已完成)
-
-- ✅ **听歌记录+统计** — `src/core/listenSession.ts`, shown in About page with export/clear
-- ✅ **激活行歌词放大** — `playDetail.isZoomActiveLrc` setting, applied via scale transform in lyric lines
-- ✅ **歌词延迟滚动** — `playDetail.lyricDelayScroll` setting, adjustable delay in ms
-- ✅ **歌词菜单（复制/搜索）** — Long-press on lyric line → Alert with Copy/Search options
-- ✅ **更新日志弹窗** — `VersionChangeLogModal` with version history data
-- ✅ **首次使用欢迎覆盖层** — `WelcomeOverlay` shown on first launch, sets `common.isShowWelcome`
-- ✅ **查找重复歌曲** — `DuplicateMusicModal` with merge action by name+singer
-- ✅ **逐字歌词进度** — lxlyric parser + word-level rendering in LrcLine component, gated by `player.isPlayLxlrc`
-
-### ✅ Priority 2 — Download Enhancements
-
-| Feature | Status | Implementation |
-|---------|--------|---------------|
-| **下载保存路径设置** | ✅ Done | `getDownloadPath` reads `download.savePath`, falls back to default. |
-| **按列表名称分组保存** | ✅ Done | `getListName()` looks up list by ID, creates subdirectory when `download.groupByList` is enabled. |
-| **嵌入封面到音频文件** | ✅ UI done | `download.embedCover` checkbox. Requires ID3 library (not available). |
-| **嵌入歌词到音频文件** | ✅ UI done | `download.embedLyric` + sub-options. Requires ID3 library. |
-| **下载独立 LRC 文件** | ✅ Partially done | `writeLrcFile` prepared. `isDownloadLrc` setting exists. Needs async lyric fetching during download. |
-| **LRC 文件编码选择** | ✅ Done | `download.lyricEncoding` selection wired to `writeLrcFile` (utf-8/gbk). |
-| **下载完成通知** | ✅ Done | `download.completeNotification` shows toast on download completion. |
-| **文件校验** | ⬜ Not implemented | Check file size after download. |
-
-### ✅ Priority 3 — Visual & UI Polish
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| **播放栏进度条样式** | ✅ Done | `playDetail.progressStyle` with 3 styles (mini/middle/full). |
-| **全局 UI 字体大小** | ✅ Done | `common.fontSize` already exists in Basic/FontSize.tsx with `useFontSize()` hook. |
-| **主题编辑器** | ✅ Done | `ThemeEditor.tsx` — color picker grid, create/save/apply custom themes (up to 10). |
-| **背景图片（按主题）** | ✅ Done | Built-in BG images selectable in theme editor (水墨/月夜/极光/木叶/新年 + none). |
-| **Melody Workshop 主题包** | ✅ Done | 4 preset themes: 旋律之春, 旋律落日, 旋律午夜, 旋律樱花. |
-| **自定义字体选择** | ⬜ Not implemented | `common.fontFamily` type/defs exist. Needs system font enumeration. |
-
-### ✅ Priority 4 — Desktop Lyric Enhancements
-
-| Feature | Status | Implementation |
-|---------|--------|---------------|
-| **行间距调整** | ✅ Passed to native | Setting `desktopLyric.lineGap` wired through `showDesktopLyricView`. Native `LyricModule.java` needs `lineGap` handling. |
-| **激活行放大** | ✅ Passed to native | Setting `desktopLyric.isZoomActiveLine` wired. Native needs implementation. |
-| **已播放颜色渐变终点色** | ✅ Passed to native | Setting `desktopLyric.style.lyricPlayedColorEnd` wired. Native needs implementation. |
-| **字体粗细** | ✅ Passed to native | Setting `desktopLyric.style.fontWeight` wired. Native needs implementation. |
-| **字体选择** | ✅ Passed to native | Setting `desktopLyric.fontFamily` wired. Native needs implementation. |
-| **显示方向** | ✅ Passed to native | Setting `desktopLyric.direction` wired. Native needs implementation. |
-| **滚动对齐** | ✅ Passed to native | Setting `desktopLyric.scrollAlign` wired. Native needs implementation. |
-| **文本对齐** | ✅ Passed to native | Setting `desktopLyric.textAlign` wired. Native needs implementation. |
-| **省略号模式** | ✅ Passed to native | Setting `desktopLyric.ellipsisMode` wired. Native needs implementation. |
-| **暂停时自动隐藏** | ✅ Done | `desktopLyric.autoHideOnPause` wired to play state. |
-
-### ✅ Priority 5 — Smaller Features
-
-| Feature | Status | Notes |
-|---------|--------|-------|
-| **音乐评论查看** | ✅ Done | Full hot/new comment tabs with per-source fetching via music SDK. |
-| **导出列表为 TXT/CSV** | ✅ Done | Export option in Mylist menu. |
-| **应用内快捷键** | ⬜ Skipped per user request | Hardware button mapping excluded. |
-| **快捷键冲突检测/录制 UI** | ⬜ Skipped per user request | Excluded with keyboard shortcuts. |
-| **桌面歌词 Melody Workshop 渐变** | ✅ Done | `lyricPlayedColorEnd` setting passed to native module. |
-| **构建/提交信息显示** | ✅ Done | `buildInfo.ts` with commit hash/date displayed in About page. |
-
 ### Implementation Pattern
 
 When adding a new feature:
@@ -195,3 +139,124 @@ When adding a new feature:
 4. Add i18n keys in `src/lang/zh-cn.json`, `en-us.json`, `zh-tw.json`
 5. Create component in `src/screens/Home/Views/Setting/settings/{Category}/` (use `CheckBoxItem` for booleans)
 6. Wire the setting into relevant UI or core logic
+
+#Purpose
+```
+# 逐字歌词功能开发方案（React Native 项目 AI 提示词）
+
+## 目标
+为 React Native 音乐播放器集成逐字过渡歌词动画，实现从左到右逐字填充高亮效果，对标 Apple Music，60fps 流畅。
+
+## 技术选型
+- 歌词渲染：`react-native-transcript-karaoke`
+- 歌词解析：`@applemusic-like-lyrics/lyric` 的 `parseLrc`（提取逻辑复用于 JS 层）
+- 本地强制对齐：`tiny-align` + `pinyin-pro`（在 `react-native-worklets-core` 或 Web Worker 中执行）
+- 音频解码：`expo-av` / `react-native-audio-api` 获取音频 Float32Array
+- 缓存：`@react-native-async-storage/async-storage` 存储精确逐字歌词 JSON
+- 多线程：`react-native-reanimated` Worklets 或 WebView Worker 回退方案
+
+## 核心数据流
+LRC 歌词 + 缓存音频 ArrayBuffer → 强制对齐引擎（后台线程）→ 精确逐字时间轴（LyricLine[]）→ 缓存 AsyncStorage → 传给 Karaoke 组件
+
+## 目录结构
+```
+
+**src/**\
+**├── components/**\
+**│   └── LyricsView\.tsx            # 歌词展示组件**\
+**├── utils/**\
+**│   ├── lyricsCache.ts            # AsyncStorage 操作**\
+**│   ├── lrcParser.ts              # LRC 解析 & 匀速降级**\
+**│   ├── alignmentManager.ts       # 对齐主控（渐进式、超时降级）**\
+**│   ├── preAlignScheduler.ts      # 预对齐调度**\
+**│   └── phonemeUtils.ts           # 汉字→音素**\
+**├── workers/**\
+**│   └── alignWorker.js             # 对齐 Worker（逐句发送结果）**
+
+````
+
+## 关键实现要点
+
+### 1. 歌词缓存 (lyricsCache.ts)
+- 使用 `AsyncStorage`，键格式：`@lyrics:songId`，值：`JSON.stringify(LyricLine[])`
+- 提供 `get(songId): Promise<LyricLine[] | null>` 和 `set(songId, data: LyricLine[]): Promise<void>`
+
+### 2. 匀速降级 (lrcParser.ts)
+- `convertLrcToAmllFallback(lrcText: string): LyricLine[]` 将 LRC 转为逐字数据，字间时长平均分配
+- 对齐失败或超时时作为兜底
+
+### 3. 音素转换 (phonemeUtils.ts)
+- `textToPhonemes(text: string): string[]` 使用 `pinyin-pro` 获取拼音并映射为音素集合
+
+### 4. 渐进式对齐管理器 (alignmentManager.ts)
+- 函数 `getLyricsDataProgressive(songId, lrcText, audioArrayBuffer, options)`
+  - `options.onLineReady(index, LyricLine)` 逐行回调
+  - `options.onComplete(LyricLine[])` 完成回调
+  - `options.timeout` 超时降级（默认 15s）
+- 流程：先查缓存 → 若命中直接 resolve；否则解码音频 → 创建 Worker → 启动超时定时器
+- 收到每行数据时调用 `onLineReady`，超时或错误时用匀速数据填充未完成行
+
+### 5. 预对齐调度 (preAlignScheduler.ts)
+- 串行队列，`addTask(songId, lrcText, audioArrayBuffer)`
+- 触发时机：
+  - 歌曲下载完成后立即触发（最高优先级）
+  - 播放列表加载时取前 5~10 首入队
+  - 应用空闲时处理剩余
+
+### 6. 歌词展示组件 (LyricsView.tsx)
+- 状态：`lyrics`（LyricLine[]，初始用匀速数据填满），`loading`
+- 流程：
+  - 收到 `songId`、`lrcText`、`cachedAudioPath` 后，立即用匀速数据初始化 `lyrics`
+  - 启动 `getLyricsDataProgressive`，在 `onLineReady` 中替换对应索引行数据
+  - 首句就绪后关闭 loading，渲染 `Karaoke` 组件
+- 加载 UI：半透明遮罩 + `ActivityIndicator` + “获取中...” 文字
+- 使用 `Karaoke` 组件：
+  ```tsx
+  <Karaoke
+    transcript={formatToTranscript(lyrics)}
+    progress={currentTime}
+    progressType="seconds"
+    activeStyle={{color: '#fff'}}
+    style={{color: 'rgba(255,255,255,0.5)'}}
+  />
+````
+
+- `formatToTranscript` 将 `LyricLine[]` 转为 `[mm:ss.SS]歌词行` 格式字符串
+
+### 7. 对齐执行环境
+
+- 优先方案：`react-native-reanimated` Worklets 后台线程执行
+- 回退方案：WebView 内嵌 Worker 通信
+- 音频数据通过 `expo-av` 或 `react-native-audio-api` 获取 PCM 数据
+
+## 用户体验
+
+- 缓存命中：瞬间展示精确歌词
+- 首次播放：显示“获取中...”约 0.5\~2 秒（对齐第一句），随后歌词逐句精准
+- 预对齐覆盖后：首次播放也无需等待
+
+## 类型定义
+
+```ts
+interface LyricWord { word: string; startTime: number; endTime: number; }
+interface LyricLine { startTime: number; endTime: number; words: LyricWord[]; }
+```
+
+## 依赖清单
+
+```
+react-native-transcript-karaoke
+@applemusic-like-lyrics/lyric
+tiny-align
+pinyin-pro
+@react-native-async-storage/async-storage
+react-native-reanimated（Worklets 线程）
+expo-av 或 react-native-audio-api（音频解码）
+```
+
+## 注意事项
+
+- 播放器需提供歌曲唯一 `songId`
+- 音频缓存需能转为 `ArrayBuffer` 或 PCM Float32Array
+- 仅允许 1 个对齐任务同时运行，防止内存峰值
+- 对齐失败静默降级为匀速方案

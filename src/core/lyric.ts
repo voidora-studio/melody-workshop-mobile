@@ -34,8 +34,8 @@ export const init = async() => {
  * @param translation lyric translation
  */
 const handleSetLyric = async(lyric: string, translation = '', romalrc = '', lxlyric = '') => {
-  lrcSetLyric(lyric, translation, romalrc)
   lrcSetLxlyric(lxlyric)
+  lrcSetLyric(lyric, translation, romalrc)
   await setDesktopLyric(lyric, translation, romalrc)
   if (settingState.setting['player.isShowBluetoothFullLyric']) {
     void updateNowPlayingTitles({

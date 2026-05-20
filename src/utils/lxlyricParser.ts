@@ -56,6 +56,22 @@ export const parseLxlyric = (lxlyric: string): ParsedLxlyricLine[] => {
 }
 
 /**
+ * Generate uniform character-level word data from plain text,
+ * distributing the line duration evenly across each character.
+ * Used as a smooth fallback when no lxlyric data is available.
+ */
+export const generateUniformWords = (text: string, lineTime: number, nextLineTime: number): WordData[] => {
+  const chars = text.split('')
+  const lineDuration = Math.max(200, nextLineTime - lineTime)
+  const charDuration = lineDuration / chars.length
+  return chars.map((char, i) => ({
+    offset: i * charDuration,
+    duration: charDuration,
+    text: char,
+  }))
+}
+
+/**
  * Build a map from line time (ms) to word array for fast lookup.
  */
 export const buildLxlyricMap = (lxlyric: string): Map<number, WordData[]> => {
