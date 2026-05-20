@@ -7,6 +7,9 @@ import LyricDesktop from '../settings/LyricDesktop'
 import Search from '../settings/Search'
 import List from '../settings/List'
 import Sync from '../settings/Sync'
+import Download from '../settings/Download'
+import NetworkProxy from '../settings/NetworkProxy'
+import OpenAPI from '../settings/OpenAPI'
 import Backup from '../settings/Backup'
 import Other from '../settings/Other'
 import Version from '../settings/Version'
@@ -36,6 +39,9 @@ const ListItem = memo(({
     case 'search': return <Search />
     case 'list': return <List />
     case 'sync': return <Sync />
+    case 'download': return <Download />
+    case 'network_proxy': return <NetworkProxy />
+    case 'open_api': return <OpenAPI />
     case 'backup': return <Backup />
     case 'other': return <Other />
     case 'version': return <Version />

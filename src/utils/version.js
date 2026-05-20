@@ -15,10 +15,10 @@ const abis = [
 ]
 
 const address = [
-  [`https://raw.githubusercontent.com/${GITHUB_OWNER}/${APP_NAME}/master/publish/version.json`, 'direct'],
-  [`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${APP_NAME}/publish/version.json`, 'direct'],
-  [`https://fastly.jsdelivr.net/gh/${GITHUB_OWNER}/${APP_NAME}/publish/version.json`, 'direct'],
-  [`https://gcore.jsdelivr.net/gh/${GITHUB_OWNER}/${APP_NAME}/publish/version.json`, 'direct'],
+  [`https://raw.githubusercontent.com/${GITHUB_OWNER}/${APP_NAME}/main/publish/version.json`, 'direct'],
+  [`https://cdn.jsdelivr.net/gh/${GITHUB_OWNER}/${APP_NAME}@main/publish/version.json`, 'direct'],
+  [`https://fastly.jsdelivr.net/gh/${GITHUB_OWNER}/${APP_NAME}@main/publish/version.json`, 'direct'],
+  [`https://gcore.jsdelivr.net/gh/${GITHUB_OWNER}/${APP_NAME}@main/publish/version.json`, 'direct'],
 ]
 
 
