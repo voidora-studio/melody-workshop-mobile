@@ -66,7 +66,7 @@ export default () => {
     clearUpdateTimeout()
     updateTimeout = BackgroundTimer.setInterval(() => {
       getCurrentTime()
-    }, 1000 / settingState.setting['player.playbackRate'])
+    }, Math.max(100, 1000 / settingState.setting['player.playbackRate']))
     getCurrentTime()
   }
 

@@ -1,4 +1,4 @@
-import { memo, useState, useCallback } from 'react'
+import { memo, useState, useCallback, useEffect } from 'react'
 import { View, TouchableOpacity } from 'react-native'
 
 import Section from '../components/Section'
@@ -25,6 +25,20 @@ export default memo(() => {
 
   const stats = getListenStats()
   const doRefresh = useCallback(() => refresh(n => n + 1), [])
+
+  // Re-render stats when listen session data changes
+  useEffect(() => {
+    const onMusicToggled = () => doRefresh()
+    const onPlayState = (isPlaying: boolean) => {
+      if (!isPlaying) doRefresh()
+    }
+    global.app_event.on('musicToggled', onMusicToggled)
+    global.state_event.on('playStateChanged', onPlayState)
+    return () => {
+      global.app_event.off('musicToggled', onMusicToggled)
+      global.state_event.off('playStateChanged', onPlayState)
+    }
+  }, [doRefresh])
 
   const handleClear = () => {
     void clearListenSessions().then(doRefresh)

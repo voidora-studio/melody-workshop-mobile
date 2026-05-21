@@ -40,10 +40,14 @@ const interpolateColor = (color1: string, color2: string, ratio: number): string
  * Apple Music-style wavefront fill animation for the active lyric line.
  *
  * Uses wall-clock advance during playback for smooth 60fps animation
- * independent of player progress event frequency. Player time is only
- * consulted to catch up (forward seek) or detect backward seeks
- * (>1s drop) — never to slow down the display, preventing the
- * freeze-then-jump bug that plagued the previous implementation.
+ * independent of player progress event frequency. Player position is
+ * smoothly chased with gradual catch-up, preventing the initial jump
+ * that would skip the first few characters of each line.
+ *
+ * When a new line mounts, displayMs starts at lineTime so the wavefront
+ * begins at position 0. A smooth chase factor closes the gap toward
+ * the true player position over ~500ms — imperceptibly fast during
+ * normal playback. Forward/backward seeks (>1s gap) snap immediately.
  *
  * react-native-transcript-karaoke's Karaoke component cannot achieve
  * inline per-character fill animation because it renders each chunk
@@ -51,15 +55,18 @@ const interpolateColor = (color1: string, color2: string, ratio: number): string
  * renders all characters of one line inline with a smooth gradient
  * wavefront transition (WAVE_WIDTH = 2 chars for CJK readability).
  */
+
 const AnimatedFillWords = memo(({ words, lineTime, playedColor, unplayedColor, size, lineHeight }: Props) => {
   const isPlay = useIsPlay()
 
-  // Progress in ms — RAF wall-clock tracking eliminates freeze/jank
-  const [displayMs, setDisplayMs] = useState(() => Math.round(playerState.progress.nowPlayTime * 1000))
+  // Always start the wavefront from the beginning of the line.
+  // The smooth-chase in the RAF loop handles catch-up to the actual
+  // audio position within ~500ms, so every character animates in.
+  const [displayMs, setDisplayMs] = useState(() => lineTime)
   const displayMsRef = useRef(displayMs)
   const rafRef = useRef<number | null>(null)
 
-  // ── RAF loop: wall-clock advance, player sync only on seek ────────
+  // ── RAF loop: wall-clock advance, smooth-chase player position ───
   useEffect(() => {
     if (!isPlay) {
       const ms = Math.round(playerState.progress.nowPlayTime * 1000)
@@ -68,37 +75,39 @@ const AnimatedFillWords = memo(({ words, lineTime, playedColor, unplayedColor, s
       return
     }
 
-    const nowMs = Math.round(playerState.progress.nowPlayTime * 1000)
-    if (nowMs > displayMsRef.current) displayMsRef.current = nowMs
     let lastWall = Date.now()
-    let lastPlayerMs = nowMs
 
     const tick = () => {
       const now = Date.now()
       const dt = now - lastWall
       lastWall = now
 
-      // If RAF was paused (app backgrounded), dt can be huge — re-sync from player instead
+      const playerMs = Math.round(playerState.progress.nowPlayTime * 1000)
+
       if (dt > 200) {
-        displayMsRef.current = Math.round(playerState.progress.nowPlayTime * 1000)
+        // App was backgrounded — re-sync from player
+        displayMsRef.current = playerMs
       } else {
         // Advance by real wall-clock delta (= audio time during normal playback)
         displayMsRef.current += dt
+
+        // Smooth-chase player position to handle the initial gap (line
+        // activated slightly after audio reached it) and clock drift.
+        const gap = playerMs - displayMsRef.current
+        if (gap > 1000) {
+          // Forward seek — snap immediately
+          displayMsRef.current = playerMs
+        } else if (gap > 0) {
+          // Smooth catch-up: close the gap over ~200ms so the wavefront
+          // catches up to the audio position quickly but without a visible jump.
+          displayMsRef.current += gap * Math.min(dt / 200, 1)
+        } else if (gap < -1000) {
+          // Backward seek (> 1s drop) — snap immediately
+          displayMsRef.current = playerMs
+          lastWall = now
+        }
       }
 
-      // Sync with player — only forward (forward seek) or detectible backward seek
-      const playerMs = Math.round(playerState.progress.nowPlayTime * 1000)
-
-      if (playerMs > lastPlayerMs + 100) {
-        // Player advanced (progress update or forward seek)
-        if (playerMs > displayMsRef.current) displayMsRef.current = playerMs
-      } else if (playerMs < lastPlayerMs - 1000) {
-        // Backward seek detected (> 1 s drop)
-        displayMsRef.current = playerMs
-        lastWall = now
-      }
-
-      lastPlayerMs = playerMs
       setDisplayMs(displayMsRef.current)
       rafRef.current = requestAnimationFrame(tick)
     }
