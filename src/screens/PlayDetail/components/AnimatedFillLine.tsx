@@ -2,6 +2,7 @@ import { memo, useRef, useState, useEffect, useMemo } from 'react'
 import { Text } from 'react-native'
 import { setSpText } from '@/utils/pixelRatio'
 import type { WordData } from '@/utils/lxlyricParser'
+import TrackPlayer from 'react-native-track-player'
 import playerState from '@/store/player/state'
 import { useIsPlay } from '@/store/player/hook'
 
@@ -14,7 +15,7 @@ interface Props {
   lineHeight: number
 }
 
-const parseColor = (color: string): { r: number; g: number; b: number } | null => {
+const parseColor = (color: string): { r: number, g: number, b: number } | null => {
   const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(color)
   if (rgb) return { r: +rgb[1], g: +rgb[2], b: +rgb[3] }
   const hex = /^#?([\da-f]{3,8})/i.exec(color)
@@ -39,34 +40,53 @@ const interpolateColor = (color1: string, color2: string, ratio: number): string
 /**
  * Apple Music-style wavefront fill animation for the active lyric line.
  *
- * Uses wall-clock advance during playback for smooth 60fps animation
- * independent of player progress event frequency. Player position is
- * smoothly chased with gradual catch-up, preventing the initial jump
- * that would skip the first few characters of each line.
- *
- * When a new line mounts, displayMs starts at lineTime so the wavefront
- * begins at position 0. A smooth chase factor closes the gap toward
- * the true player position over ~500ms — imperceptibly fast during
- * normal playback. Forward/backward seeks (>1s gap) snap immediately.
- *
- * react-native-transcript-karaoke's Karaoke component cannot achieve
- * inline per-character fill animation because it renders each chunk
- * as a sibling <Text> element (each on its own line). This component
- * renders all characters of one line inline with a smooth gradient
- * wavefront transition (WAVE_WIDTH = 2 chars for CJK readability).
+ * Polls TrackPlayer.getPosition() at ~60 Hz and reads the freshest value
+ * directly in the RAF loop — no wall-clock interpolation, no smooth-chase.
+ * This keeps the wavefront within ~10 ms of the real audio clock, so the
+ * first character of each new line is at most a few percent pre-filled,
+ * which is visually imperceptible. Equivalent in accuracy to desktop
+ * <audio>.currentTime polling.
  */
+
+const POLL_MS = 16
 
 const AnimatedFillWords = memo(({ words, lineTime, playedColor, unplayedColor, size, lineHeight }: Props) => {
   const isPlay = useIsPlay()
 
-  // Always start the wavefront from the beginning of the line.
-  // The smooth-chase in the RAF loop handles catch-up to the actual
-  // audio position within ~500ms, so every character animates in.
   const [displayMs, setDisplayMs] = useState(() => lineTime)
   const displayMsRef = useRef(displayMs)
   const rafRef = useRef<number | null>(null)
+  const positionRef = useRef(0)
 
-  // ── RAF loop: wall-clock advance, smooth-chase player position ───
+  // ── High-frequency position poll (~60 fps) ──────────────────────
+  useEffect(() => {
+    if (!isPlay) return
+
+    let isActive = true
+    let timerId: ReturnType<typeof setTimeout> | null = null
+
+    const poll = async() => {
+      if (!isActive) return
+      try {
+        const pos = await TrackPlayer.getPosition()
+        if (isActive && pos != null) {
+          positionRef.current = Math.round(pos * 1000)
+        }
+      } catch {
+        // ignore
+      }
+      if (isActive) timerId = setTimeout(poll, POLL_MS)
+    }
+
+    timerId = setTimeout(poll, 0)
+
+    return () => {
+      isActive = false
+      if (timerId != null) clearTimeout(timerId)
+    }
+  }, [isPlay])
+
+  // ── RAF loop: snap directly to the freshest position ────────────
   useEffect(() => {
     if (!isPlay) {
       const ms = Math.round(playerState.progress.nowPlayTime * 1000)
@@ -75,39 +95,9 @@ const AnimatedFillWords = memo(({ words, lineTime, playedColor, unplayedColor, s
       return
     }
 
-    let lastWall = Date.now()
-
     const tick = () => {
-      const now = Date.now()
-      const dt = now - lastWall
-      lastWall = now
-
-      const playerMs = Math.round(playerState.progress.nowPlayTime * 1000)
-
-      if (dt > 200) {
-        // App was backgrounded — re-sync from player
-        displayMsRef.current = playerMs
-      } else {
-        // Advance by real wall-clock delta (= audio time during normal playback)
-        displayMsRef.current += dt
-
-        // Smooth-chase player position to handle the initial gap (line
-        // activated slightly after audio reached it) and clock drift.
-        const gap = playerMs - displayMsRef.current
-        if (gap > 1000) {
-          // Forward seek — snap immediately
-          displayMsRef.current = playerMs
-        } else if (gap > 0) {
-          // Smooth catch-up: close the gap over ~200ms so the wavefront
-          // catches up to the audio position quickly but without a visible jump.
-          displayMsRef.current += gap * Math.min(dt / 200, 1)
-        } else if (gap < -1000) {
-          // Backward seek (> 1s drop) — snap immediately
-          displayMsRef.current = playerMs
-          lastWall = now
-        }
-      }
-
+      const playerMs = positionRef.current
+      displayMsRef.current = playerMs > 0 ? playerMs : Math.round(playerState.progress.nowPlayTime * 1000)
       setDisplayMs(displayMsRef.current)
       rafRef.current = requestAnimationFrame(tick)
     }
@@ -140,7 +130,7 @@ const AnimatedFillWords = memo(({ words, lineTime, playedColor, unplayedColor, s
 
   const lineDuration = Math.max(100, lineEnd - lineTime)
   const lineProgress = Math.min(1, Math.max(0, (displayMs - lineTime) / lineDuration))
-  const WAVE_WIDTH = 2.0 // characters — wider wavefront for smoother CJK transition
+  const WAVE_WIDTH = 2.0
   const totalChars = chars.length
 
   return (
@@ -156,7 +146,7 @@ const AnimatedFillWords = memo(({ words, lineTime, playedColor, unplayedColor, s
         }
         const color = charProgress <= 0 ? unplayedColor
           : charProgress >= 1 ? playedColor
-          : interpolateColor(unplayedColor, playedColor, charProgress)
+            : interpolateColor(unplayedColor, playedColor, charProgress)
 
         return (
           <Text key={i} style={{ color }} textBreakStrategy="simple">

@@ -1,7 +1,7 @@
 {
   "name": "melody-workshop-mobile",
-  "version": "1.2.0",
-  "versionCode": 7,
+  "version": "1.2.1",
+  "versionCode": 8,
   "private": true,
   "scripts": {
     "dev": "react-native run-android --active-arch-only",
