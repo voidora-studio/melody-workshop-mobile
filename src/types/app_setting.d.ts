@@ -582,6 +582,11 @@ declare global {
       'network.proxy.port': string
 
       /**
+       * 更新下载镜像地址（留空使用 GitHub 直连）
+       */
+      'version.githubMirror': string
+
+      /**
        * 是否启用OpenAPI服务
        */
       'openAPI.enable': boolean

@@ -2,6 +2,7 @@ import { compareVer } from '@/utils'
 import { downloadNewVersion, getVersionInfo } from '@/utils/version'
 import versionActions from '@/store/version/action'
 import versionState, { type InitState } from '@/store/version/state'
+import settingState from '@/store/setting/state'
 import { getIgnoreVersion, getIgnoreVersionFailTipTime, saveIgnoreVersion, saveIgnoreVersionFailTipTime } from '@/utils/data'
 import { showVersionModal } from '@/navigation'
 import { Navigation } from 'react-native-navigation'
@@ -72,7 +73,7 @@ export const downloadUpdate = () => {
   versionActions.setVersionInfo({ status: 'downloading' })
   versionActions.setProgress({ total: 0, current: 0 })
 
-  downloadNewVersion(versionState.versionInfo.newVersion!.version, (total: number, current: number) => {
+  downloadNewVersion(versionState.versionInfo.newVersion!.version, settingState.setting['version.githubMirror'], (total: number, current: number) => {
     // console.log(total, current)
     versionActions.setProgress({ total, current })
   }).then(() => {

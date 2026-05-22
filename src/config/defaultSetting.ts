@@ -121,6 +121,8 @@ const defaultSetting: LX.AppSetting = {
   'network.proxy.host': '',
   'network.proxy.port': '',
 
+  'version.githubMirror': '',
+
   'openAPI.enable': false,
   'openAPI.port': '23330',
   'openAPI.bindLan': false,

@@ -82,34 +82,43 @@ let downloadJobId = null
 const noop = (total, download) => {}
 let apkSavePath
 
-export const downloadNewVersion = async(version, onDownload = noop) => {
+export const downloadNewVersion = async(version, mirrorUrl = '', onDownload = noop) => {
   const abi = await getTargetAbi()
-  const url = `https://github.com/${GITHUB_OWNER}/${APP_NAME}/releases/download/v${version}/${APP_NAME}-v${version}-${abi}.apk`
+  const githubUrl = `https://github.com/${GITHUB_OWNER}/${APP_NAME}/releases/download/v${version}/${APP_NAME}-v${version}-${abi}.apk`
   let savePath = temporaryDirectoryPath + '/melody-workshop-mobile.apk'
 
   if (downloadJobId) stopDownload(downloadJobId)
 
-  const { jobId, promise } = downloadFile(url, savePath, {
-    progressInterval: 500,
-    connectionTimeout: 20000,
-    readTimeout: 30000,
-    begin({ statusCode, contentLength }) {
-      onDownload(contentLength, 0)
-      // switch (statusCode) {
-      //   case 200:
-      //   case 206:
-      //     break
-      //   default:
-      //     onDownload(null, contentLength, 0)
-      //     break
-      // }
-    },
-    progress({ contentLength, bytesWritten }) {
-      onDownload(contentLength, bytesWritten)
-    },
-  })
-  downloadJobId = jobId
-  return promise.then(() => {
+  const doDownload = async(url) => {
+    const { jobId, promise } = downloadFile(url, savePath, {
+      progressInterval: 500,
+      connectionTimeout: 20000,
+      readTimeout: 30000,
+      begin({ statusCode, contentLength }) {
+        onDownload(contentLength, 0)
+      },
+      progress({ contentLength, bytesWritten }) {
+        onDownload(contentLength, bytesWritten)
+      },
+    })
+    downloadJobId = jobId
+    return promise
+  }
+
+  const tryDownload = async() => {
+    if (mirrorUrl) {
+      const fullMirrorUrl = mirrorUrl.replace(/\/+$/, '') + '/' + githubUrl
+      try {
+        await doDownload(fullMirrorUrl)
+        return
+      } catch {
+        // mirror failed, fall through to direct
+      }
+    }
+    await doDownload(githubUrl)
+  }
+
+  return tryDownload().then(() => {
     apkSavePath = savePath
     return updateApp()
   })

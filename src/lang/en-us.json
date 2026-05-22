@@ -573,6 +573,9 @@
   "version_title_new": "🌟 New version found 🌟",
   "version_title_unknown": "❓ Failed to get the latest version information ❓",
   "version_title_update": "🚀 App update 🚀",
+  "version_mirror": "Update Download Mirror",
+  "version_mirror_desc": "Leave empty for direct GitHub download. Configure a mirror URL if GitHub is slow or inaccessible.",
+  "version_mirror_placeholder": "https://ghproxy.net/",
 
   "setting_play_detail_zoom_active_lrc": "Zoom active lyric line",
   "setting_play_detail_lyric_delay_scroll": "Lyric scroll delay (ms)",

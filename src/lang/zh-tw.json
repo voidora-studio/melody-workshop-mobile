@@ -573,6 +573,9 @@
   "version_title_new": "🌟 發現新版本 🌟",
   "version_title_unknown": "❓ 獲取最新版本資訊失敗 ❓",
   "version_title_update": "🚀 軟體更新 🚀",
+  "version_mirror": "更新下載鏡像",
+  "version_mirror_desc": "留空使用 GitHub 直連。可為下載慢或無法訪問 GitHub 的用戶配置鏡像加速地址。",
+  "version_mirror_placeholder": "https://ghproxy.net/",
 
   "setting_play_detail_zoom_active_lrc": "縮放目前播放的歌詞行",
   "setting_play_detail_lyric_delay_scroll": "歌詞延遲滾動（毫秒）",

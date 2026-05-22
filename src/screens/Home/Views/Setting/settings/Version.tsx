@@ -11,6 +11,7 @@ import { useVersionDownloadProgressUpdated, useVersionInfo } from '@/store/versi
 import Text from '@/components/common/Text'
 import { showModal } from '@/core/version'
 import ChangeLogModal, { type ChangeLogModalType } from './VersionChangeLogModal'
+import VersionMirrorInput from './VersionMirrorInput'
 
 const currentVer = process.versions.app
 export default memo(() => {
@@ -83,6 +84,7 @@ export default memo(() => {
         </View>
       </SubTitle>
       <ChangeLogModal ref={changeLogRef} />
+      <VersionMirrorInput />
     </Section>
   )
 })
