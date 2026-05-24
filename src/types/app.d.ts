@@ -69,6 +69,9 @@ declare global {
   var dislike_event: DislikeEventTypes
   var state_event: StateEventTypes
 
+  /** JSI synchronous position read — returns ExoPlayer.getCurrentPosition() in seconds, or -1 on error */
+  var getPositionSync: () => number
+
   var Buffer: typeof _Buffer
 
   module NodeJS {

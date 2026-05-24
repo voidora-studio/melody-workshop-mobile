@@ -1,4 +1,4 @@
-import { memo, useMemo, useEffect, useRef, useCallback } from 'react'
+import { memo, useMemo, useState, useEffect, useRef, useCallback } from 'react'
 import { View, FlatList, type FlatListProps, type LayoutChangeEvent, type NativeSyntheticEvent, type NativeScrollEvent, Alert, Pressable } from 'react-native'
 import { type Line, type WordData, useLrcSet, getLxlyricLines_, isLxlyricEnabled } from '@/plugins/lyric'
 import { createStyle } from '@/utils/tools'
@@ -7,11 +7,10 @@ import { useSettingValue } from '@/store/setting/hook'
 import { AnimatedColorText } from '@/components/common/Text'
 import { setSpText } from '@/utils/pixelRatio'
 import playerState from '@/store/player/state'
-import { useProgress, useIsPlay } from '@/store/player/hook'
+import { useIsPlay } from '@/store/player/hook'
 import { scrollTo } from '@/utils/scroll'
 import PlayLine, { type PlayLineType } from '../components/PlayLine'
 import AnimatedFillWords from '../components/AnimatedFillLine'
-import { generateUniformWords } from '@/utils/lxlyricParser'
 import Clipboard from '@react-native-clipboard/clipboard'
 import searchActions from '@/store/search/action'
 import { Navigation } from 'react-native-navigation'
@@ -126,20 +125,40 @@ const LrcLine = memo(({ line, lineNum, activeLine, isZoomActiveLrc, words, onLay
 })
 const wait = async() => new Promise(resolve => setTimeout(resolve, 100))
 
-// Compute active line index from audio progress instead of relying on lrc-file-parser's internal timer
+// Compute active line index from JSI sync position for sub-frame latency.
+// Falls back to async progress when JSI is unavailable.
+// Uses full millisecond precision for pixel-accurate line matching.
 const useActiveLine = (lyricLines: Line[]) => {
-  const progress = useProgress()
   const isPlay = useIsPlay()
+  const [currentTimeMs, setCurrentTimeMs] = useState(0)
+
+  useEffect(() => {
+    if (!isPlay || !lyricLines.length) {
+      return
+    }
+    let raf: number
+    const tick = () => {
+      const pos = global.getPositionSync?.()
+      if (typeof pos === 'number' && pos >= 0) {
+        setCurrentTimeMs(pos * 1000)
+      } else {
+        setCurrentTimeMs(playerState.progress.nowPlayTime * 1000)
+      }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [isPlay, lyricLines.length])
+
   return useMemo(() => {
-    if (!lyricLines.length || !isPlay) return -1
-    const currentTimeMs = progress.nowPlayTime * 1000
+    if (!lyricLines.length) return -1
     for (let i = lyricLines.length - 1; i >= 0; i--) {
       if (currentTimeMs >= lyricLines[i].time) {
         return i
       }
     }
     return -1
-  }, [lyricLines, progress.nowPlayTime, isPlay])
+  }, [lyricLines, currentTimeMs])
 }
 
 export default () => {
@@ -150,12 +169,15 @@ export default () => {
     if (isLxlyricEnabled()) {
       const lxLines = getLxlyricLines_()
       if (lxLines.length > 0) {
-        return lxLines.map(lxLine => ({
-          time: lxLine.time,
-          text: lxLine.words.map(w => w.text).join(''),
-          words: lxLine.words,
-          extendedLyrics: [] as string[],
-        }))
+        return lxLines.map(lxLine => {
+          const match = lyricLines.find(l => l.time === lxLine.time)
+          return {
+            time: lxLine.time,
+            text: lxLine.words.map(w => w.text).join(''),
+            words: lxLine.words,
+            extendedLyrics: match?.extendedLyrics ?? [],
+          }
+        })
       }
     }
     return lyricLines
@@ -163,13 +185,12 @@ export default () => {
 
   const line = useActiveLine(displayLines as Line[])
 
-  // Words for the active line: real lxlyric data, or uniform fallback from LRC
+  // Words for the active line: real lxlyric data, or null (line-mode)
   const activeLineWords = useMemo(() => {
     if (line < 0) return null
     const lineData = displayLines[line] as any
     if (lineData?.words?.length) return lineData.words as WordData[]
-    const nextLineTime = (displayLines[line + 1] as any)?.time ?? (lineData.time + 3000)
-    return generateUniformWords(lineData.text, lineData.time, nextLineTime)
+    return null
   }, [line, displayLines])
 
   const flatListRef = useRef<FlatList>(null)

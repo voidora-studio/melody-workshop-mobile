@@ -1,8 +1,7 @@
-import { memo, useRef, useState, useEffect, useMemo } from 'react'
-import { Text } from 'react-native'
+import { memo, useState, useEffect, useMemo, useCallback } from 'react'
+import { View, Text } from 'react-native'
 import { setSpText } from '@/utils/pixelRatio'
 import type { WordData } from '@/utils/lxlyricParser'
-import TrackPlayer from 'react-native-track-player'
 import playerState from '@/store/player/state'
 import { useIsPlay } from '@/store/player/hook'
 
@@ -15,146 +14,130 @@ interface Props {
   lineHeight: number
 }
 
-const parseColor = (color: string): { r: number, g: number, b: number } | null => {
-  const rgb = /^rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/.exec(color)
-  if (rgb) return { r: +rgb[1], g: +rgb[2], b: +rgb[3] }
-  const hex = /^#?([\da-f]{3,8})/i.exec(color)
-  if (hex) {
-    let h = hex[1]
-    if (h.length === 3) h = h[0] + h[0] + h[1] + h[1] + h[2] + h[2]
-    if (h.length >= 6) return { r: parseInt(h[0] + h[1], 16), g: parseInt(h[2] + h[3], 16), b: parseInt(h[4] + h[5], 16) }
-  }
-  return null
-}
-
-const interpolateColor = (color1: string, color2: string, ratio: number): string => {
-  const c1 = parseColor(color1)
-  const c2 = parseColor(color2)
-  if (!c1 || !c2) return color1
-  const r = Math.round(c1.r + (c2.r - c1.r) * ratio)
-  const g = Math.round(c1.g + (c2.g - c1.g) * ratio)
-  const b = Math.round(c1.b + (c2.b - c1.b) * ratio)
-  return `rgb(${r},${g},${b})`
-}
-
 /**
- * Apple Music-style wavefront fill animation for the active lyric line.
+ * Left-to-right text reveal matching desktop's
+ * `background-size: X% 100%` + `background-clip: text` approach.
  *
- * Polls TrackPlayer.getPosition() at ~60 Hz and reads the freshest value
- * directly in the RAF loop — no wall-clock interpolation, no smooth-chase.
- * This keeps the wavefront within ~10 ms of the real audio clock, so the
- * first character of each new line is at most a few percent pre-filled,
- * which is visually imperceptible. Equivalent in accuracy to desktop
- * <audio>.currentTime polling.
+ * We calculate the cumulative fill percentage across the entire line
+ * respecting per-character timing (pauses at character boundaries),
+ * then clip the played-color overlay with a pixel-width View.
+ * The inner Text always gets the full measured width so it never wraps.
  */
-
-const POLL_MS = 16
-
 const AnimatedFillWords = memo(({ words, lineTime, playedColor, unplayedColor, size, lineHeight }: Props) => {
   const isPlay = useIsPlay()
-
-  const [displayMs, setDisplayMs] = useState(() => lineTime)
-  const displayMsRef = useRef(displayMs)
-  const rafRef = useRef<number | null>(null)
-  const positionRef = useRef(0)
-
-  // ── High-frequency position poll (~60 fps) ──────────────────────
-  useEffect(() => {
-    if (!isPlay) return
-
-    let isActive = true
-    let timerId: ReturnType<typeof setTimeout> | null = null
-
-    const poll = async() => {
-      if (!isActive) return
-      try {
-        const pos = await TrackPlayer.getPosition()
-        if (isActive && pos != null) {
-          positionRef.current = Math.round(pos * 1000)
-        }
-      } catch {
-        // ignore
-      }
-      if (isActive) timerId = setTimeout(poll, POLL_MS)
-    }
-
-    timerId = setTimeout(poll, 0)
-
-    return () => {
-      isActive = false
-      if (timerId != null) clearTimeout(timerId)
-    }
-  }, [isPlay])
-
-  // ── RAF loop: snap directly to the freshest position ────────────
+  const [displayMs, setDisplayMs] = useState(() => {
+    const pos = global.getPositionSync?.()
+    if (typeof pos === 'number' && pos >= 0) return pos * 1000
+    return playerState.progress.nowPlayTime * 1000
+  })
   useEffect(() => {
     if (!isPlay) {
-      const ms = Math.round(playerState.progress.nowPlayTime * 1000)
-      displayMsRef.current = ms
-      setDisplayMs(ms)
+      const pos = global.getPositionSync?.()
+      if (typeof pos === 'number' && pos >= 0) {
+        setDisplayMs(pos * 1000)
+      } else {
+        setDisplayMs(playerState.progress.nowPlayTime * 1000)
+      }
       return
     }
 
+    let raf: number | null = null
     const tick = () => {
-      const playerMs = positionRef.current
-      displayMsRef.current = playerMs > 0 ? playerMs : Math.round(playerState.progress.nowPlayTime * 1000)
-      setDisplayMs(displayMsRef.current)
-      rafRef.current = requestAnimationFrame(tick)
-    }
-
-    rafRef.current = requestAnimationFrame(tick)
-    return () => {
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current)
-        rafRef.current = null
+      const pos = global.getPositionSync?.()
+      if (typeof pos === 'number' && pos >= 0) {
+        setDisplayMs(pos * 1000)
+      } else {
+        setDisplayMs(playerState.progress.nowPlayTime * 1000)
       }
+      raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => {
+      if (raf !== null) cancelAnimationFrame(raf)
     }
   }, [isPlay])
 
-  // ── Characters & wavefront computation ────────────────────────────
   const fontSize = setSpText(size)
+  const fullText = useMemo(() => words.map(w => w.text).join(''), [words])
 
-  const { chars, lineEnd } = useMemo(() => {
-    let maxEnd = 0
-    const c = words.flatMap(word => {
-      const perCharDuration = word.duration / word.text.length
-      return word.text.split('').map((char, i) => {
-        const offset = word.offset + i * perCharDuration
-        const end = offset + perCharDuration
-        if (end > maxEnd) maxEnd = end
-        return { text: char, offset, duration: perCharDuration }
-      })
-    })
-    return { chars: c, lineEnd: lineTime + maxEnd }
-  }, [words, lineTime])
+  // Cumulative fill percentage across the entire line.
+  const fillPercent = useMemo(() => {
+    const elapsed = displayMs - lineTime
+    if (elapsed <= 0) return 0
 
-  const lineDuration = Math.max(100, lineEnd - lineTime)
-  const lineProgress = Math.min(1, Math.max(0, (displayMs - lineTime) / lineDuration))
-  const WAVE_WIDTH = 2.0
-  const totalChars = chars.length
+    let totalChars = 0
+    let filledUnits = 0
+    let past = false
 
-  return (
-    <Text textBreakStrategy="simple" style={{ fontSize, lineHeight }}>
-      {chars.map((char, i) => {
-        const wavePos = lineProgress * totalChars
-        const distance = wavePos - i
-        let charProgress = 0
-        if (distance >= WAVE_WIDTH / 2) {
-          charProgress = 1
-        } else if (distance > -WAVE_WIDTH / 2) {
-          charProgress = (distance + WAVE_WIDTH / 2) / WAVE_WIDTH
+    for (const word of words) {
+      for (let ci = 0; ci < word.text.length; ci++) {
+        const perCharDuration = word.duration / word.text.length
+        const charStart = word.offset + ci * perCharDuration
+        if (perCharDuration <= 0) {
+          totalChars++
+          if (!past) {
+            if (elapsed >= charStart) filledUnits++
+            else past = true
+          }
+          continue
         }
-        const color = charProgress <= 0 ? unplayedColor
-          : charProgress >= 1 ? playedColor
-            : interpolateColor(unplayedColor, playedColor, charProgress)
+        totalChars++
+        if (past) continue
+        const charEnd = charStart + perCharDuration
+        if (elapsed >= charEnd) {
+          filledUnits++
+        } else if (elapsed > charStart) {
+          filledUnits += (elapsed - charStart) / perCharDuration
+          past = true
+        } else {
+          past = true
+        }
+      }
+    }
 
-        return (
-          <Text key={i} style={{ color }} textBreakStrategy="simple">
-            {char.text}
-          </Text>
-        )
-      })}
-    </Text>
+    return totalChars > 0 ? filledUnits / totalChars : 1
+  }, [words, displayMs, lineTime])
+
+  // Measure the full text pixel width once via onLayout.
+  // This is the key to avoiding text wrapping in the clipped overlay:
+  // the inner Text always gets the full width, only the parent clip View
+  // is sized to (textWidth * fillPercent) pixels.
+  const [textWidth, setTextWidth] = useState(0)
+  const handleLayout = useCallback((e: any) => {
+    const w = e.nativeEvent.layout.width
+    if (w > 0 && w !== textWidth) setTextWidth(w)
+  }, [textWidth])
+
+  if (fillPercent >= 1) {
+    return (
+      <Text textBreakStrategy="simple" style={{ color: playedColor, fontSize, lineHeight }}>
+        {fullText}
+      </Text>
+    )
+  }
+
+  if (fillPercent <= 0 || textWidth <= 0) {
+    return (
+      <Text textBreakStrategy="simple" style={{ color: unplayedColor, fontSize, lineHeight }} onLayout={handleLayout}>
+        {fullText}
+      </Text>
+    )
+  }
+
+  // Partial fill: overlay the full text in playedColor,
+  // clipped to (textWidth * fillPercent) pixels from the left.
+  const clipWidth = textWidth * fillPercent
+  return (
+    <View style={{ position: 'relative', alignSelf: 'flex-start' }}>
+      <Text textBreakStrategy="simple" style={{ color: unplayedColor, fontSize, lineHeight }}>
+        {fullText}
+      </Text>
+      <View style={{ position: 'absolute', top: 0, left: 0, width: clipWidth, overflow: 'hidden' }}>
+        <Text textBreakStrategy="simple" style={{ color: playedColor, fontSize, lineHeight, width: textWidth }}>
+          {fullText}
+        </Text>
+      </View>
+    </View>
   )
 })
 

@@ -9,6 +9,15 @@
 
 # Add any project specific keep options here:
 
+# Keep TrackPlayer classes used by SyncPositionModule reflection
+-keep class com.guichaguri.trackplayer.module.MusicModule { *; }
+-keep class com.guichaguri.trackplayer.service.MusicBinder { *; }
+-keep class com.guichaguri.trackplayer.service.MusicManager { *; }
+-keep class com.guichaguri.trackplayer.service.player.ExoPlayback { *; }
+
+# Keep JSI position sync classes — accessed via JNI GetMethodID
+-keep class cn.toside.music.mobile.position.SyncPositionModule { *; }
+
 -keep class com.reactnativenavigation.views.element.animators.** { *; }
 # -keepclassmembers class com.reactnativenavigation.views.element.animators.** { *; }
 

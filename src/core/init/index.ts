@@ -15,6 +15,7 @@ import settingState from '@/store/setting/state'
 import { checkUpdate } from '@/core/version'
 import { bootLog } from '@/utils/bootLog'
 import { cheatTip } from '@/utils/tools'
+import { NativeModules } from 'react-native'
 
 let isFirstPush = true
 const handlePushedHomeScreen = async() => {
@@ -56,6 +57,11 @@ export default async() => {
   bootLog('Playback Service Registered.')
   await initPlayer(setting)
   bootLog('Player inited.')
+  const syncPos = NativeModules.SyncPositionModule
+  if (syncPos?.startModule) syncPos.startModule()
+  if (syncPos?.getPosition) {
+    global.getPositionSync = () => syncPos.getPosition()
+  }
   await dataInit(setting)
   bootLog('Data inited.')
   await initCommonState(setting)
