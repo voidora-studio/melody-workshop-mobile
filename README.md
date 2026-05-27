@@ -4,7 +4,7 @@
 
 <p align="center">
   <em>基于 LX Music（洛雪音乐助手）开源项目的音乐查找与播放移动版</em><br>
-  <strong>voidora-studio 维护发行</strong>
+  <strong>imunco 维护发行</strong>
 </p>
 
 <p align="center">一个基于 React Native 开发的音乐软件</p>
@@ -23,12 +23,12 @@
 - Android 5 及以上
 
 ***注：目前没有计划支持 iOS 和 HarmonyOS NEXT。**<br>
-桌面版项目地址：<https://github.com/voidora-studio/melody-workshop>*
+桌面版项目地址：<https://github.com/imunco/melody-workshop>*
 
 ### 与本版相关
 
 - **品牌**：界面、图标、主题色已按「旋律工坊」统一设计
-- **署名**：本发行版由 **voidora-studio** 维护与分发
+- **署名**：本发行版由 **imunco** 维护与分发
 
 ### 上游说明
 
@@ -75,6 +75,11 @@
 1. 参照上游[源码使用方法](https://lyswhut.github.io/lx-music-doc/mobile/use-source-code)设置开发环境；
 2. 克隆本仓库代码并切换至 `dev` 分支进行开发；
 3. 提交 PR 至 `dev` 分支。
+
+## 反馈与联系
+
+- **问题反馈**：如有 Bug 报告或功能建议，请在当前仓库提交 [Issue](https://github.com/imunco/melody-workshop-mobile/issues)，按模板填写即可。
+- **官方群聊**：点击链接加入群聊【奇点未码 · Uncoders】：<https://qm.qq.com/q/ainGgIul8I>
 
 ## 项目协议
 

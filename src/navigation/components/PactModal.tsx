@@ -18,7 +18,7 @@ const Content = () => {
   const theme = useTheme()
 
   const openHomePage = () => {
-    void openUrl('https://github.com/voidora-studio/melody-workshop-mobile#readme')
+    void openUrl('https://github.com/imunco/melody-workshop-mobile#readme')
   }
   const openLicensePage = () => {
     void openUrl('http://www.apache.org/licenses/LICENSE-2.0')

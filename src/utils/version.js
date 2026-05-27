@@ -3,7 +3,7 @@ import { downloadFile, stopDownload, temporaryDirectoryPath } from '@/utils/fs'
 import { getSupportedAbis, installApk } from '@/utils/nativeModules/utils'
 import { APP_PROVIDER_NAME } from '@/config/constant'
 
-const GITHUB_OWNER = 'voidora-studio'
+const GITHUB_OWNER = 'imunco'
 const APP_NAME = 'melody-workshop-mobile'
 
 const abis = [
