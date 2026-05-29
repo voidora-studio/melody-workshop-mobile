@@ -48,7 +48,9 @@ export const checkUpdate = async() => {
   } else {
     versionInfo.status = 'idle'
     versionInfo.isUnknown = false
-    if (compareVer(versionInfo.version, versionInfo.newVersion.version) != -1) {
+    // Check if current version >= remote version.
+    // Use string equality as a safety guard against edge cases (e.g. invisible chars, encoding quirks)
+    if (versionInfo.version === versionInfo.newVersion.version || compareVer(versionInfo.version, versionInfo.newVersion.version) != -1) {
       versionInfo.isLatest = true
     }
   }
@@ -65,8 +67,6 @@ export const checkUpdate = async() => {
       showModal()
     }
   }
-  // console.log(compareVer(process.versions.app, versionInfo.version))
-  // console.log(process.versions.app, versionInfo.version)
 }
 
 export const downloadUpdate = () => {

@@ -1,7 +1,7 @@
 {
   "name": "melody-workshop-mobile",
-  "version": "1.2.3",
-  "versionCode": 10,
+  "version": "1.2.4",
+  "versionCode": 11,
   "private": true,
   "scripts": {
     "dev": "react-native run-android --active-arch-only",
@@ -26,7 +26,7 @@
     "node": ">= 18",
     "npm": ">= 8.5.2"
   },
-  "description": "旋律工坊 — 基于洛雪音乐助手（LX Music）开源项目的音乐查找与播放移动版（wzystudio 维护发行）",
+  "description": "旋律工坊 — 基于洛雪音乐助手（LX Music）开源项目的音乐查找与播放移动版（奇点未码·Uncode Studio 维护发行）",
   "repository": {
     "type": "git",
     "url": "git+https://github.com/imunco/melody-workshop-mobile.git"
@@ -36,7 +36,7 @@
     "react-native-app",
     "melody-workshop"
   ],
-  "author": "wzystudio",
+  "author": "奇点未码·Uncode Studio",
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/imunco/melody-workshop-mobile/issues"

@@ -63,6 +63,12 @@ export default memo(() => {
   const openFAQPage = () => {
     void openUrl('https://lyswhut.github.io/lx-music-doc/mobile/faq')
   }
+  const openForkIssuePage = () => {
+    void openUrl('https://github.com/imunco/melody-workshop-mobile/issues')
+  }
+  const openQQGroup = () => {
+    void openUrl('https://qm.qq.com/q/ainGgIul8I')
+  }
   const openPactModal = () => {
     showPactModal()
   }
@@ -120,13 +126,25 @@ export default memo(() => {
       )}
 
       <View style={styles.part}>
-        <Text style={styles.text}>旋律工坊 由 wzystudio 维护发行。界面与图标已按本发行版统一设计。</Text>
+        <Text style={styles.text}>旋律工坊 由 奇点未码·Uncode Studio 维护发行。界面与图标已按本发行版统一设计。</Text>
       </View>
-      {/*
+
       <View style={styles.part}>
-        <Text style={styles.text}>发行说明：本发行版由 wzystudio 独立维护与分发，与上游 GitHub Release 无绑定关系；若未配置独立更新源，版本检查仍可能指向开源上游，请以本页说明为准。</Text>
+        <Text style={styles.boldText}>反馈与联系</Text>
       </View>
-      */}
+      <View style={styles.part}>
+        <Text style={styles.text}>Bug 报告或功能建议请提交 </Text>
+        <TouchableOpacity onPress={openForkIssuePage}>
+          <Text style={textLinkStyle}>GitHub Issue</Text>
+        </TouchableOpacity>
+      </View>
+      <View style={styles.part}>
+        <Text style={styles.text}>加入 QQ 群交流：</Text>
+        <TouchableOpacity onPress={openQQGroup}>
+          <Text style={textLinkStyle}>https://qm.qq.com/q/ainGgIul8I</Text>
+        </TouchableOpacity>
+      </View>
+
       <View style={styles.part}>
         <Text style={styles.boldText}>源项目说明</Text>
       </View>
@@ -176,7 +194,7 @@ export default memo(() => {
       </View>
       <View style={styles.part}>
         <Text style={styles.text}>By: </Text>
-        <Text style={styles.text}>wzystudio（旋律工坊）</Text>
+        <Text style={styles.text}>奇点未码·Uncode Studio（旋律工坊）</Text>
       </View>
       <View style={{ ...styles.buildInfoContainer, borderTopColor: theme['c-primary-light-300-alpha-800'] + '' }}>
         <Text style={styles.buildInfoText}>Build: {buildInfo.commitHash}</Text>
